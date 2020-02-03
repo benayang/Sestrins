@@ -1,0 +1,131 @@
+---
+title: "Sestrin Pathway Figures"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
+library(tibble)
+```
+
+```{r}
+setwd("C:/Users/NOBEL/Box/Lab Notes/Lab Notes Benjamin/Sestrins/Mouse RNA-Seq")
+```
+
+```{r}
+d0_up = read.delim2(file="./nosva_v4/DAVID Annotation/d0 lfc1 up 0.01 FDR/d0_lfc1_up_0.01FDR_KEGG.txt",
+                    header = TRUE, stringsAsFactors = FALSE, blank.lines.skip = TRUE, as.is=TRUE, sep="\t")
+d0_up_subset = d0_up[,c("Term", "Count", "PValue", "Fold.Enrichment")]
+d0_up_subset[,2:3] = as.numeric(unlist(d0_up_subset[,2:3]))
+
+d0_down = read.delim2(file="./nosva_v4/DAVID Annotation/d0 lfc1 down 0.01 FDR/d0_lfc1_down_0.01FDR_KEGG.txt",
+                    header = TRUE, stringsAsFactors = FALSE)
+d0_down_subset = d0_down[,c("Term", "Count", "PValue", "Fold.Enrichment")]
+d0_down_subset[,2:3] = as.numeric(unlist(d0_down_subset[,2:3]))
+
+d0_up_0.05 = subset(d0_up_subset, subset=d0_up_subset$PValue<=0.05)
+d0_up_0.05$log10p = -log10(d0_up_0.05$PValue)
+d0_up_0.05$l2fc = rep("Up",nrow(d0_up_0.05))
+
+d0_down_0.05 = subset(d0_down_subset, subset=d0_down_subset$PValue<=0.05)
+d0_down_0.05$log10p = -log10(d0_down_0.05$PValue)
+d0_down_0.05$l2fc = rep("Down",nrow(d0_down_0.05))
+
+d0_df = rbind(d0_up_0.05, d0_down_0.05)
+d0_df_terms = matrix(unlist(strsplit(unlist(d0_df$Term), ":")), nrow=nrow(d0_df), ncol=2, byrow=TRUE)
+d0_df$name = sprintf("%s (%s)", d0_df_terms[,2], d0_df_terms[,1])
+
+d0_df$name = factor(d0_df$name, levels = d0_df$name[order(d0_df$log10p)])
+d0_df$l2fc = factor(d0_df$l2fc, levels = c("Down","Up"))
+d0_df
+```
+
+```{r}
+d0_plot = ggbarplot(d0_df, x="name", y="log10p", 
+                    ylab="-log10(p-value)", xlab="KEGG Term", 
+                    legend.title="", legend=c(0.9,0.975), font.legend=c(12),
+                    color="white", fill="l2fc", palette = "jco",
+                    sort.val="asc", sort.by.groups = TRUE) + coord_flip() + 
+  theme(text = element_text(face="bold", size=12))
+#+ theme_light() + font("xy.text", face="bold")
+d0_plot
+ggexport(d0_plot, filename="./nosva_v4/Figures/d0_lfc1_kegg.tiff", 
+         width=800, height=600, res = 100)
+```
+
+```{r}
+kegg_dot = ggplot(d0_df, aes(x=factor(name, levels=name[order(l2fc,decreasing = TRUE)]), y=log10p, size=Count)) + 
+  geom_point(aes(color=d0_df$l2fc), stat="identity") + 
+  coord_flip() + 
+  ylab("-log10(p-value)") + 
+  xlab("KEGG Term") + 
+  theme(text = element_text(face="bold", size=12), 
+        legend.position=c(0.95,0.9)) +
+  scale_size(range = c(1,10)) + 
+  theme_pubclean()
+kegg_dot
+ggsave(kegg_dot, filename="./nosva_v4/Figures/d0_lfc1_dot_kegg.tiff",
+       width=8, height=9, units="in", dpi=320)
+```
+
+```{r}
+kegg_dot = ggdotchart(d0_df, x = "name", y="log10p", size="Count", 
+                      group = "l2fc", color="l2fc", 
+                      rotate = TRUE, y.text.col = TRUE,
+                      sorting = "descending",
+                      palette = "lancet",
+                      y.text.col = TRUE) + 
+  scale_size(range = c(1,10))
+
+kegg_dot = ggpar(kegg_dot, 
+      ylab = "-log10(padj)", xlab = "KEGG Term",
+      font.y = c(14, "bold"), font.x = c(14, "bold"),
+      font.ytickslab = c(14, "bold"),
+      font.xtickslab = c(14, "bold"),
+      legend = "right",
+      legend.title = c("Regulation"), font.legend = c(12, "bold"))
+
+kegg_dot
+
+ggexport(kegg_dot, filename="./nosva_v4/Figures/d0_lfc1_dot_kegg_DAVID.tiff", height=400, width=900, res=90)
+```
+
+
+```{r}
+d0_up_0.05$name = sprintf("%s (%s)", d0_up_0.05$description, d0_up_0.05$geneSet)
+d0_up_0.05$name = factor(d0_up_0.05$name, levels = d0_up_0.05$name[order(d0_up_0.05$log10p)])
+ggplot(data=d0_up_0.05) + geom_bar(mapping=aes(x=name,y=log10p), stat="identity") + xlab("KEGG Term") + ylab("-log10(pValue)") +
+  coord_flip()
+```
+
+```{r}
+d0_down_0.05$name = sprintf("%s (%s)", d0_down_0.05$description, d0_down_0.05$geneSet)
+d0_down_0.05$name = factor(d0_down_0.05$name, levels = d0_down_0.05$name[order(d0_down_0.05$log10p)])
+ggplot(data=d0_down_0.05) + geom_bar(mapping=aes(x=name,y=log10p), stat="identity") + xlab("KEGG Term") + ylab("-log10(pValue)") +
+  coord_flip()
+```
+
+```{r}
+d0_plot = 
+```
+
+
+```{r}
+d0_up_plot = ggbarplot(d0_up_0.05, x="name", y="log10p", fill="black", ylab="-log10(p-value)", xlab="KEGG Term", 
+                       title="Day 0 Upregulated") + rotate() + theme_light() + font("xy.text", face="bold")
+d0_up_plot
+ggexport(d0_up_plot, filename ="./nosva_v3/Figures/d0_up_0.05.tiff", res=100)
+```
+
+```{r}
+d0_down_plot = ggbarplot(d0_down_0.05, x="name", y="log10p", fill="black", ylab="-log10(p-value)", xlab="KEGG Term", 
+                       title="Day 0 Downregulated") + rotate() + theme_light() + font("xy.text", face="bold")
+d0_down_plot
+ggexport(d0_down_plot, filename ="./nosva_v3/Figures/d0_down_0.05.tiff", res=100)
+```
