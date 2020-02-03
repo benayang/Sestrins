@@ -1,0 +1,31 @@
+conda activate ben-rnaseq
+
+~/tools/FastQC/fastqc -t 32 -o ./fastqc --extract -f fastq ./fastq/*.fastq.gz 
+
+multiqc -f -o ./fastqc/ ./fastqc
+
+use trim_script.sh
+java -jar ~/tools/Trimmomatic-0.38/trimmomatic-0.38.jar PE -threads 16 ./fastq/MuSC-d-0-S-KO-17K-R1.fastq.gz ./fastq/MuSC-d-0-S-KO-17K-R2.fastq.gz ./trim_fastq/MuSC_d0_KO_R1_paired_trimmed.fq.gz ./trim_fastq/MuSC_d0_KO_R1_unpaired.fq.gz ./trim_fastq/MuSC_d0_KO_R2_paired_trimmed.fq.gz ./trim_fastq/MuSC_d0_KO_R2_unpaired.fq.gz ILLUMINACLIP:../../tools/Trimmomatic-0.38/adapters/NexteraPE-PE.fa:2:30:10:2:keepBothReads LEADING:3 TRAILING:3 MINLEN:36
+
+~/tools/FastQC/fastqc -t 32 -o ./trim_fastqc --extract -f fastq ./trim_fastq/*.fastq.gz
+
+multiqc -f -o ./fastqc/ ./fastqc
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+kallisto index -i mm38.p6.idx Mus_musculus.GRCm38.cdna.all.fa.gz 
+
+[build] loading fasta file Mus_musculus.GRCm38.cdna.all.fa.gz
+[build] k-mer length: 31
+[build] warning: clipped off poly-A tail (longer than 10)
+        from 645 target sequences
+[build] warning: replaced 3 non-ACGUT characters in the input sequence
+        with pseudorandom nucleotides
+[build] counting k-mers ... done.
+[build] building target de Bruijn graph ...  done 
+[build] creating equivalence classes ...  done
+[build] target de Bruijn graph has 737821 contigs and contains 100927146 k-mers 
+
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+run kallisto_batch.sh

@@ -1,0 +1,74 @@
+(base) labuser@nobelws:/nas/homes/benyang/Sestrins/fastq$ ../trim_script.sh 
+Picked up _JAVA_OPTIONS: -Xms256M -Xmx728M -XX:ParallelGCThreads=1
+TrimmomaticPE: Started with arguments:
+ -threads 32 -trimlog /nas/homes/benyang/Sestrins/trim_fastq/trimlog.txt MuSC-d-0-KO-R1.fastq.gz MuSC-d-0-KO-R2.fastq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-0-KO-R1_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-0-KO-unpaired.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-0-KO-R2_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-0-KO-R2_unpaired.fq.gz ILLUMINACLIP:/home/labuser/tools/Trimmomatic-0.38/adapters/NexteraPE-PE.fa:2:30:10:2:keepBothReads LEADING:3 TRAILING:3 MINLEN:36
+Using PrefixPair: 'AGATGTGTATAAGAGACAG' and 'AGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTCCGAGCCCACGAGAC'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTGACGCTGCCGACGA'
+ILLUMINACLIP: Using 1 prefix pairs, 4 forward/reverse sequences, 0 forward only sequences, 0 reverse only sequences
+Quality encoding detected as phred33
+Input Read Pairs: 35127203 Both Surviving: 34987846 (99.60%) Forward Only Surviving: 88831 (0.25%) Reverse Only Surviving: 50380 (0.14%) Dropped: 146 (0.00%)
+TrimmomaticPE: Completed successfully
+Picked up _JAVA_OPTIONS: -Xms256M -Xmx728M -XX:ParallelGCThreads=1
+TrimmomaticPE: Started with arguments:
+ -threads 32 -trimlog /nas/homes/benyang/Sestrins/trim_fastq/trimlog.txt MuSC-d-0-WT-R1.fastq.gz MuSC-d-0-WT-R2.fastq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-0-WT-R1_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-0-WT-unpaired.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-0-WT-R2_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-0-WT-R2_unpaired.fq.gz ILLUMINACLIP:/home/labuser/tools/Trimmomatic-0.38/adapters/NexteraPE-PE.fa:2:30:10:2:keepBothReads LEADING:3 TRAILING:3 MINLEN:36
+Using PrefixPair: 'AGATGTGTATAAGAGACAG' and 'AGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTCCGAGCCCACGAGAC'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTGACGCTGCCGACGA'
+ILLUMINACLIP: Using 1 prefix pairs, 4 forward/reverse sequences, 0 forward only sequences, 0 reverse only sequences
+Quality encoding detected as phred33
+Input Read Pairs: 42329947 Both Surviving: 42068911 (99.38%) Forward Only Surviving: 122323 (0.29%) Reverse Only Surviving: 138328 (0.33%) Dropped: 385 (0.00%)
+TrimmomaticPE: Completed successfully
+Picked up _JAVA_OPTIONS: -Xms256M -Xmx728M -XX:ParallelGCThreads=1
+TrimmomaticPE: Started with arguments:
+ -threads 32 -trimlog /nas/homes/benyang/Sestrins/trim_fastq/trimlog.txt MuSC-d-21-KO-R1.fastq.gz MuSC-d-21-KO-R2.fastq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-21-KO-R1_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-21-KO-unpaired.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-21-KO-R2_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-21-KO-R2_unpaired.fq.gz ILLUMINACLIP:/home/labuser/tools/Trimmomatic-0.38/adapters/NexteraPE-PE.fa:2:30:10:2:keepBothReads LEADING:3 TRAILING:3 MINLEN:36
+Using PrefixPair: 'AGATGTGTATAAGAGACAG' and 'AGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTCCGAGCCCACGAGAC'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTGACGCTGCCGACGA'
+ILLUMINACLIP: Using 1 prefix pairs, 4 forward/reverse sequences, 0 forward only sequences, 0 reverse only sequences
+Quality encoding detected as phred33
+Input Read Pairs: 36610392 Both Surviving: 36467108 (99.61%) Forward Only Surviving: 58107 (0.16%) Reverse Only Surviving: 85014 (0.23%) Dropped: 163 (0.00%)
+TrimmomaticPE: Completed successfully
+Picked up _JAVA_OPTIONS: -Xms256M -Xmx728M -XX:ParallelGCThreads=1
+TrimmomaticPE: Started with arguments:
+ -threads 32 -trimlog /nas/homes/benyang/Sestrins/trim_fastq/trimlog.txt MuSC-d-21-WT-R1.fastq.gz MuSC-d-21-WT-R2.fastq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-21-WT-R1_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-21-WT-unpaired.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-21-WT-R2_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-21-WT-R2_unpaired.fq.gz ILLUMINACLIP:/home/labuser/tools/Trimmomatic-0.38/adapters/NexteraPE-PE.fa:2:30:10:2:keepBothReads LEADING:3 TRAILING:3 MINLEN:36
+Using PrefixPair: 'AGATGTGTATAAGAGACAG' and 'AGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTCCGAGCCCACGAGAC'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTGACGCTGCCGACGA'
+ILLUMINACLIP: Using 1 prefix pairs, 4 forward/reverse sequences, 0 forward only sequences, 0 reverse only sequences
+Quality encoding detected as phred33
+Input Read Pairs: 42631307 Both Surviving: 42464946 (99.61%) Forward Only Surviving: 83105 (0.19%) Reverse Only Surviving: 83098 (0.19%) Dropped: 158 (0.00%)
+TrimmomaticPE: Completed successfully
+Picked up _JAVA_OPTIONS: -Xms256M -Xmx728M -XX:ParallelGCThreads=1
+TrimmomaticPE: Started with arguments:
+ -threads 32 -trimlog /nas/homes/benyang/Sestrins/trim_fastq/trimlog.txt MuSC-d-7-KO-R1.fastq.gz MuSC-d-7-KO-R2.fastq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-7-KO-R1_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-7-KO-unpaired.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-7-KO-R2_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-7-KO-R2_unpaired.fq.gz ILLUMINACLIP:/home/labuser/tools/Trimmomatic-0.38/adapters/NexteraPE-PE.fa:2:30:10:2:keepBothReads LEADING:3 TRAILING:3 MINLEN:36
+Using PrefixPair: 'AGATGTGTATAAGAGACAG' and 'AGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTCCGAGCCCACGAGAC'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTGACGCTGCCGACGA'
+ILLUMINACLIP: Using 1 prefix pairs, 4 forward/reverse sequences, 0 forward only sequences, 0 reverse only sequences
+Quality encoding detected as phred33
+Input Read Pairs: 36281319 Both Surviving: 36172216 (99.70%) Forward Only Surviving: 51365 (0.14%) Reverse Only Surviving: 57668 (0.16%) Dropped: 70 (0.00%)
+TrimmomaticPE: Completed successfully
+Picked up _JAVA_OPTIONS: -Xms256M -Xmx728M -XX:ParallelGCThreads=1
+TrimmomaticPE: Started with arguments:
+ -threads 32 -trimlog /nas/homes/benyang/Sestrins/trim_fastq/trimlog.txt MuSC-d-7-WT-R1.fastq.gz MuSC-d-7-WT-R2.fastq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-7-WT-R1_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-7-WT-unpaired.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-7-WT-R2_paired_trimmed.fq.gz /nas/homes/benyang/Sestrins/trim_fastq/MuSC-d-7-WT-R2_unpaired.fq.gz ILLUMINACLIP:/home/labuser/tools/Trimmomatic-0.38/adapters/NexteraPE-PE.fa:2:30:10:2:keepBothReads LEADING:3 TRAILING:3 MINLEN:36
+Using PrefixPair: 'AGATGTGTATAAGAGACAG' and 'AGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'GTCTCGTGGGCTCGGAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'TCGTCGGCAGCGTCAGATGTGTATAAGAGACAG'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTCCGAGCCCACGAGAC'
+Using Long Clipping Sequence: 'CTGTCTCTTATACACATCTGACGCTGCCGACGA'
+ILLUMINACLIP: Using 1 prefix pairs, 4 forward/reverse sequences, 0 forward only sequences, 0 reverse only sequences
+Quality encoding detected as phred33
+Input Read Pairs: 44256707 Both Surviving: 44143923 (99.75%) Forward Only Surviving: 56531 (0.13%) Reverse Only Surviving: 56176 (0.13%) Dropped: 77 (0.00%)
+TrimmomaticPE: Completed successfully
+

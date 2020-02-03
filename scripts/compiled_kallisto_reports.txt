@@ -1,0 +1,83 @@
+{
+	"n_targets": 190069,
+	"n_bootstraps": 100,
+	"n_processed": 34987846,
+	"n_pseudoaligned": 7812791,
+	"n_unique": 1297870,
+	"p_pseudoaligned": 22.3,
+	"p_unique": 3.7,
+	"kallisto_version": "0.46.0",
+	"index_version": 10,
+	"start_time": "Thu Nov 28 12:52:53 2019",
+	"call": "kallisto quant -b 100 -i /nas/homes/benyang/Sestrins/ref/hg38_kallisto.idx -t 40 -o /nas/homes/benyang/Sestrins/kallisto_out/MuSC-d-0-KO/ MuSC-d-0-KO-R1_paired_trimmed.fq.gz MuSC-d-0-KO-R2_paired_trimmed.fq.gz"
+}
+
+{
+	"n_targets": 190069,
+	"n_bootstraps": 100,
+	"n_processed": 42068911,
+	"n_pseudoaligned": 9537433,
+	"n_unique": 1668035,
+	"p_pseudoaligned": 22.7,
+	"p_unique": 4.0,
+	"kallisto_version": "0.46.0",
+	"index_version": 10,
+	"start_time": "Thu Nov 28 12:56:26 2019",
+	"call": "kallisto quant -b 100 -i /nas/homes/benyang/Sestrins/ref/hg38_kallisto.idx -t 40 -o /nas/homes/benyang/Sestrins/kallisto_out/MuSC-d-0-WT/ MuSC-d-0-WT-R1_paired_trimmed.fq.gz MuSC-d-0-WT-R2_paired_trimmed.fq.gz"
+}
+
+{
+	"n_targets": 190069,
+	"n_bootstraps": 100,
+	"n_processed": 36172216,
+	"n_pseudoaligned": 8539275,
+	"n_unique": 1403388,
+	"p_pseudoaligned": 23.6,
+	"p_unique": 3.9,
+	"kallisto_version": "0.46.0",
+	"index_version": 10,
+	"start_time": "Thu Nov 28 13:08:20 2019",
+	"call": "kallisto quant -b 100 -i /nas/homes/benyang/Sestrins/ref/hg38_kallisto.idx -t 40 -o /nas/homes/benyang/Sestrins/kallisto_out/MuSC-d-7-KO/ MuSC-d-7-KO-R1_paired_trimmed.fq.gz MuSC-d-7-KO-R2_paired_trimmed.fq.gz"
+}
+
+{
+	"n_targets": 190069,
+	"n_bootstraps": 100,
+	"n_processed": 44143923,
+	"n_pseudoaligned": 10324491,
+	"n_unique": 1702684,
+	"p_pseudoaligned": 23.4,
+	"p_unique": 3.9,
+	"kallisto_version": "0.46.0",
+	"index_version": 10,
+	"start_time": "Thu Nov 28 13:11:59 2019",
+	"call": "kallisto quant -b 100 -i /nas/homes/benyang/Sestrins/ref/hg38_kallisto.idx -t 40 -o /nas/homes/benyang/Sestrins/kallisto_out/MuSC-d-7-WT/ MuSC-d-7-WT-R1_paired_trimmed.fq.gz MuSC-d-7-WT-R2_paired_trimmed.fq.gz"
+}
+
+{
+	"n_targets": 190069,
+	"n_bootstraps": 100,
+	"n_processed": 36467108,
+	"n_pseudoaligned": 8066902,
+	"n_unique": 1312650,
+	"p_pseudoaligned": 22.1,
+	"p_unique": 3.6,
+	"kallisto_version": "0.46.0",
+	"index_version": 10,
+	"start_time": "Thu Nov 28 13:00:33 2019",
+	"call": "kallisto quant -b 100 -i /nas/homes/benyang/Sestrins/ref/hg38_kallisto.idx -t 40 -o /nas/homes/benyang/Sestrins/kallisto_out/MuSC-d-21-KO/ MuSC-d-21-KO-R1_paired_trimmed.fq.gz MuSC-d-21-KO-R2_paired_trimmed.fq.gz"
+}
+
+{
+	"n_targets": 190069,
+	"n_bootstraps": 100,
+	"n_processed": 42464946,
+	"n_pseudoaligned": 9768384,
+	"n_unique": 1609159,
+	"p_pseudoaligned": 23.0,
+	"p_unique": 3.8,
+	"kallisto_version": "0.46.0",
+	"index_version": 10,
+	"start_time": "Thu Nov 28 13:04:18 2019",
+	"call": "kallisto quant -b 100 -i /nas/homes/benyang/Sestrins/ref/hg38_kallisto.idx -t 40 -o /nas/homes/benyang/Sestrins/kallisto_out/MuSC-d-21-WT/ MuSC-d-21-WT-R1_paired_trimmed.fq.gz MuSC-d-21-WT-R2_paired_trimmed.fq.gz"
+}
