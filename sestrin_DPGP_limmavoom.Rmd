@@ -1,0 +1,238 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r include=FALSE}
+library(limma)
+library(ggpubr)
+library(ggplot2)
+library(statmod)
+library(tximport)
+library(rhdf5)
+library("EnsDb.Mmusculus.v79")
+library(reshape2)
+```
+
+```{r}
+edb = EnsDb.Mmusculus.v79
+k <- keys(edb, keytype = "TXNAME")
+tx2gene = genes(edb, filter = TxIdFilter(k), columns = c("tx_id","gene_id"), return.type="data.frame")
+```
+
+# Load Dataset and Design
+```{r}
+setwd("C:/Users/NOBEL/Box/Lab Notes/Lab Notes Benjamin/Sestrins/Mouse RNA-Seq")
+#setwd("C:/Users/benjy/Box/Lab Notes/Lab Notes Benjamin/Sestrins/Mouse RNA-Seq")
+condition = factor(rep(c("WT", "KO"), each=2, times=3), levels = c("WT","KO"))
+day = factor(rep(c("d-0","d-7","d-21"), each=4), levels = c("d-0","d-7","d-21"))
+replicate = factor(rep(c("R1","R2"), times=6))
+
+sample_id = paste(day, condition, replicate, sep="-")
+sample_path = file.path(".", "mm38", paste("MuSC", sample_id, sep="-"))
+sampleTable = data.frame(sample=as.character(sample_id), condition=condition, day=day, replicate=replicate)
+sampleTable <- dplyr::mutate(sampleTable, path = sample_path)
+# s2c$day = as.factor(s2c$day)'
+sampleTable$group = factor(paste(sampleTable$day,sampleTable$condition,sep = '-'))
+sampleTable$group = relevel(sampleTable$group, ref="d-0-WT")
+sampleTable$group = make.names(sampleTable$group)
+sampleTable = sampleTable[-9,]
+sampleTable
+```
+
+```{r}
+files <- file.path(sampleTable$path, "abundance.h5")
+names(files) = sampleTable$sample
+txi.kallisto <- tximport(files, type = "kallisto",  tx2gene=tx2gene, ignoreTxVersion = TRUE, countsFromAbundance = "lengthScaledTPM")
+```
+
+```{r}
+data = txi.kallisto$counts
+data = data[rowSums(data)>0,]
+#data = as.matrix(asinh(data))
+```
+
+```{r}
+data_dist = dist(t(data))
+ggplot(as.data.frame(cmdscale(data_dist)), aes(x=cmdscale(data_dist)[,1], y=cmdscale(data_dist)[,2], color=as.factor(sampleTable$group))) + 
+  geom_point()
+```
+
+# Correlation
+```{r}
+spearman_cor = cor(data, method = "spearman")
+pearson_cor = cor(data, method = "pearson")
+```
+
+```{r}
+library(pheatmap)
+
+pheatmap(spearman_cor)
+pheatmap(pearson_cor)
+```
+
+# Run PCA
+```{r}
+data.pca=prcomp(t(data))
+var_explained=as.character(round(100*data.pca$sdev^2/sum(data.pca$sdev^2),2))
+print(barplot(100*data.pca$sdev^2/sum(data.pca$sdev^2),las=2,ylab="% Variance Explained",xlab="Principal Component",ylim=c(0,40), xlim=c(0,10)))
+```
+
+# Fit with limma
+```{r}
+library(edgeR)
+
+y = DGEList(data)
+keep = filterByExpr(y)
+y = y[keep,]
+y = calcNormFactors(y)
+
+design = model.matrix(~0+group, data=sampleTable)
+
+v = voom(y, design, plot=TRUE)
+fit = lmFit(v, design)
+fit = eBayes(fit)
+# fit = lmFit(data, design)
+```
+
+# Contrasts
+```{r}
+#create contrasts of interest 
+cont.matrix=makeContrasts(
+    d0_KO_vs_WT="groupd.0.KO - groupd.0.WT",  
+    d7_KO_vs_WT="groupd.7.KO - groupd.7.WT",
+    d21_KO_vs_WT="groupd.21.KO - groupd.21.WT",
+    levels=design)
+```
+
+```{r}
+pval_thresh=0.01
+lfc_thresh=1
+```
+
+```{r}
+fit2=contrasts.fit(fit,cont.matrix)
+e=eBayes(fit2)
+comparisons=colnames(cont.matrix)
+```
+
+```{r}
+for(i in seq(1,length(comparisons)))
+{
+  tab<-topTable(e, number=nrow(e),coef=i,lfc=lfc_thresh, p.value = pval_thresh)
+  up=sum(tab$logFC>0)
+  down=sum(tab$logFC<0)
+  sig=nrow(tab)
+  curtitle=paste(comparisons[i],'\n','sig:',sig,'\n','up:',up,'\n','down:',down,'\n')
+  print(curtitle)
+  vals=topTable(e,number=nrow(e),coef=i)
+  vals$pscaled=-1*log10(vals$adj.P.Val)
+  vals$sig=vals$adj.P.Val<pval_thresh & abs(vals$logFC)>lfc_thresh 
+  png(paste("./nosva_v4/DPGP/volcano_diff",comparisons[i],".png",sep=""))
+  print(ggplot(data=vals,
+               aes(y=vals$pscaled,x=vals$logFC,color=vals$sig))+
+               geom_point(alpha=0.1)+
+               xlab("log2(FC)")+
+               ylab("-log10(pval)")+
+               ggtitle(curtitle)+
+               theme_bw()+
+               scale_color_manual(values=c("#000000","#FF0000")))
+  dev.off() 
+  write.table(tab,file=paste("./nosva_v4/DPGP/limma-voom/diff_",comparisons[i],".tsv",sep=""),quote=FALSE,sep='\t',row.names = TRUE,col.names = TRUE)
+}
+```
+
+```{r}
+d0_DEgenes = rownames(topTable(e, number=nrow(e),coef=1,lfc=lfc_thresh, p.value = pval_thresh))
+d7_DEgenes = rownames(topTable(e, number=nrow(e),coef=2,lfc=lfc_thresh, p.value = pval_thresh))
+d21_DEgenes = rownames(topTable(e, number=nrow(e),coef=3,lfc=lfc_thresh, p.value = pval_thresh))
+total_DEgenes = unlist(unique(c(d0_DEgenes, d7_DEgenes, d21_DEgenes)))
+head(total_DEgenes)
+
+data_dge = as.data.frame(data[total_DEgenes,])
+data_dge
+```
+
+```{r}
+# average across replicates
+d0.WT.means = rowMeans(data_dge[,1:2])
+d0.KO.means = rowMeans(data_dge[,3:4])
+d7.WT.means = rowMeans(data_dge[,5:6])
+d7.KO.means = rowMeans(data_dge[,7:8])
+d21.WT.means = data_dge[,9]
+d21.KO.means = rowMeans(data_dge[,10:11])
+data_dge_avg = data.frame(list(d0WT=d0.WT.means, d0KO=d0.KO.means, d7WT=d7.WT.means, d7KO=d7.KO.means, d21WT=d21.WT.means, d21KO=d21.KO.means))
+data_dge_avg
+```
+
+```{r}
+# calculate fold changes
+d0.fc = data_dge_avg$d0KO / data_dge_avg$d0WT
+d7.fc = data_dge_avg$d7KO / data_dge_avg$d7WT
+d21.fc = data_dge_avg$d21KO / data_dge_avg$d21WT
+data_dge_fc = data.frame(list(d0=d0.fc, d7=d7.fc, d21=d21.fc))
+rownames(data_dge_fc) = rownames(data_dge_avg)
+data_dge_fc
+```
+
+```{r}
+# calculate z-scores
+data_dge_zscore = t(data_dge_fc) # scale works on columns, not rows
+data_dge_zscore = scale(data_dge_zscore, center=TRUE, scale=TRUE)
+data_dge_zscore = as.data.frame(t(data_dge_zscore)) # return data to original dimensions
+data_dge_zscore
+```
+
+```{r}
+write.table(data_dge_zscore, file="./nosva_v4/DPGP/limma-voom/data_dge_zscore.txt", sep="\t", quote=FALSE, row.names = TRUE, col.names = TRUE)
+```
+
+
+```{r}
+dpgp_tab = topTable(e, number=nrow(e),lfc=lfc_thresh, p.value = pval_thresh)
+colnames(dpgp_tab)[1:3] = c("0", "7", "21")
+head(dpgp_tab)
+write.table(dpgp_tab[,1:3], file="./nosva_v4/DPGP/dpgp_tab.tsv", quote=FALSE, sep="\t", row.names = TRUE, col.names=TRUE)
+```
+
+# Process DPGP clusters
+```{r}
+dpgp_clust = read.table("./nosva_v4/DPGP/_optimal_clustering.txt", sep="\t", header=TRUE)
+dpgp_clust$symbol = genes(edb, filter = GeneIdFilter(dpgp_clust$gene), columns = "symbol", return.type="data.frame")$symbol
+write.table(dpgp_clust, file="./nosva_v4/DPGP/dpgp_clusters.tsv", quote=FALSE, sep="\t", row.names=FALSE, col.names=TRUE)
+```
+
+# Plot time expression of clusters
+```{r}
+dpgp_plot_df = dpgp_tab[,1:3]
+dpgp_clust_means = list()
+for(i in seq(1,length(unique(dpgp_clust$cluster)))){
+  clust_genes = subset(dpgp_clust, subset=cluster==i)$gene
+  vals = dpgp_plot_df[clust_genes,]
+  print(vals)
+  dpgp_clust_means[[i]] = cbind(colMeans(vals), sapply(vals, sd, na.rm = TRUE))
+}
+dpgp_clust_means = as.data.frame(matrix(unlist(dpgp_clust_means), nrow=3), row.names = c("0", "7", "21"))
+colnames(dpgp_clust_means) = lapply(unique(dpgp_clust$cluster), FUN=function(x){paste0("c",x)})
+dpgp_clust_means$day = rownames(dpgp_clust_means)
+dpgp_clust_means
+```
+
+```{r}
+dpgp_melt = melt(dpgp_clust_means)
+dpgp_melt
+```
+```{r}
+subset(dpgp_melt, subset=variable=="c1")
+```
+
+```{r}
+dpgp_plotlist = list()
+for(i in seq(1,length(unique(dpgp_melt$variable)))){
+  clust = as.character(unique(dpgp_melt$variable)[i])
+  #print(clust)
+  #print(subset(dpgp_melt, subset=variable==clust))
+  dpgp_plotlist[[i]] = ggscatter(subset(dpgp_melt, subset=variable==clust), x="day", y="value")
+}
+ggscatter(dpgp_melt, x="day", y="value", facet.by="variable")
+```

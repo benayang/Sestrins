@@ -1,0 +1,31 @@
+term_ID,description,frequency,plot_X,plot_Y,plot_size,log10 p-value,uniqueness,dispensability,representative,eliminated
+GO:0035635,"entry of bacterium into host cell",0.024%,-0.713,-5.548,0.778,-1.5374,0.896,0.000,35635,0
+GO:0038128,"ERBB2 signaling pathway",0.014%, 3.931, 5.410,0.602,-2.3859,0.777,0.000,38128,0
+GO:0000028,"ribosomal small subunit assembly",0.081%,-3.983,-5.136,1.255,-1.3414,0.964,0.009,28,0
+GO:0016266,"O-glycan processing",0.033%,-3.657, 3.102,0.903,-1.9552,0.711,0.017,16266,0
+GO:1903706,"regulation of hemopoiesis",1.653%, 3.439,-4.134,2.543,-1.5747,0.856,0.043,1903706,0
+GO:0010939,"regulation of necrotic cell death",0.109%, 4.535,-0.411,1.380,-1.5031,0.805,0.053,10939,0
+GO:0060544,"regulation of necroptotic process",0.071%,null,null,1.204,-1.4145,0.807,0.876,10939,1
+GO:0008210,"estrogen metabolic process",0.076%, 6.703, 0.778,1.230,-1.4715,0.803,0.056,8210,0
+GO:0042573,"retinoic acid metabolic process",0.104%,null,null,1.362,-1.4420,0.609,0.778,8210,1
+GO:0070987,"error-free translesion synthesis",0.019%,-2.789, 7.533,0.699,-1.3414,0.747,0.145,70987,0
+GO:0042276,"error-prone translesion synthesis",0.019%,null,null,0.699,-1.3197,0.747,0.862,70987,1
+GO:0052696,"flavonoid glucuronidation",0.009%,-6.929, 3.826,0.477,-1.6608,0.599,0.164,52696,0
+GO:0019585,"glucuronate metabolic process",0.071%,null,null,1.204,-1.4715,0.564,0.995,52696,1
+GO:0052697,"xenobiotic glucuronidation",0.043%,null,null,1.000,-1.5747,0.554,0.859,52696,1
+GO:0052695,"cellular glucuronidation",0.066%,null,null,1.176,-1.3887,0.566,0.961,52696,1
+GO:0042167,"heme catabolic process",0.019%,-6.589, 0.686,0.699,-1.7689,0.678,0.171,42167,0
+GO:0006787,"porphyrin-containing compound catabolic process",0.019%,null,null,0.699,-1.7689,0.772,1.000,42167,1
+GO:1904380,"endoplasmic reticulum mannose trimming",0.014%,-0.878,-0.174,0.602,-1.3414,0.843,0.176,1904380,0
+GO:0019218,"regulation of steroid metabolic process",0.380%,-4.935, 5.313,1.908,-1.4145,0.674,0.208,19218,0
+GO:0045833,"negative regulation of lipid metabolic process",0.404%,null,null,1.934,-1.3414,0.679,0.766,19218,1
+GO:0016055,"Wnt signaling pathway",1.847%, 2.681, 6.722,2.591,-1.5330,0.727,0.298,16055,0
+GO:0035567,"non-canonical Wnt signaling pathway",0.261%,null,null,1.748,-1.4117,0.749,0.788,16055,1
+GO:0007399,"nervous system development",10.304%, 4.005,-3.748,3.337,-1.6014,0.874,0.387,7399,0
+GO:0043632,"modification-dependent macromolecule catabolic process",2.479%,-7.045,-1.704,2.719,-1.5374,0.783,0.422,43632,0
+GO:0005978,"glycogen biosynthetic process",0.190%,-6.007, 4.122,1.613,-1.3644,0.604,0.488,5978,0
+GO:0009250,"glucan biosynthetic process",0.190%,null,null,1.613,-1.3644,0.604,0.956,5978,1
+GO:0038127,"ERBB signaling pathway",0.484%, 3.380, 6.134,2.013,-1.7837,0.759,0.500,38127,0
+GO:0019068,"virion assembly",0.114%,-1.982,-5.414,1.398,-1.3887,0.863,0.545,19068,0
+GO:0006493,"protein O-linked glycosylation",0.228%,-4.253, 2.775,1.690,-1.4903,0.686,0.624,6493,0
+GO:1901185,"negative regulation of ERBB signaling pathway",0.100%, 3.624, 5.699,1.342,-2.3028,0.752,0.673,1901185,0

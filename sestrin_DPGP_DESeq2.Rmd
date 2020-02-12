@@ -1,0 +1,388 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+setwd("C:/Users/benjy/Box/Lab Notes/Lab Notes Benjamin/Sestrins/Mouse RNA-Seq")
+```
+
+```{r message=FALSE, include=FALSE}
+library("DESeq2")
+library("EnsDb.Mmusculus.v79")
+library("ggplot2")
+library("pheatmap")
+library("dplyr")
+library("ggpubr")
+library("reshape2")
+library("ggthemes")
+```
+
+```{r}
+resLFC_d0 = readRDS("./nosva_v4/RDS/resLFC_d0.RDS")
+resLFC_d7 = readRDS("./nosva_v4/RDS/resLFC_d7.RDS")
+resLFC_d21 = readRDS("./nosva_v4/RDS/resLFC_d21.RDS")
+rld = readRDS("./nosva_v4/RDS/rld.RDS")
+```
+
+```{r}
+edb = EnsDb.Mmusculus.v79
+k <- keys(edb, keytype = "TXNAME")
+tx2gene = genes(edb, filter = TxIdFilter(k), columns = c("tx_id","gene_id"), return.type="data.frame")
+```
+
+```{r}
+padj_thresh = 0.01
+lfc_thresh = 1
+```
+
+```{r}
+# isolate DE genes by thresholds
+resLFC_d0_sub = rownames(subset(resLFC_d0, subset=(padj<=padj_thresh & abs(log2FoldChange)>=lfc_thresh)))
+resLFC_d7_sub = rownames(subset(resLFC_d7, subset=(padj<=padj_thresh & abs(log2FoldChange)>=lfc_thresh)))
+resLFC_d21_sub = rownames(subset(resLFC_d21, subset=(padj<=padj_thresh & abs(log2FoldChange)>=lfc_thresh)))
+```
+
+```{r}
+# only keep genes that are differentially expressed across consecutive timepoints
+# left_int = intersect(resLFC_d0_sub, resLFC_d7_sub)
+# right_int = intersect(resLFC_d7_sub, resLFC_d21_sub)
+# total_int = unique(c(left_int, right_int))
+# print(c(length(left_int), length(right_int), length(total_int)))
+
+# combine genes differentially expressed in at least one time point.
+total_int = unique(c(resLFC_d0_sub, resLFC_d7_sub, resLFC_d21_sub))
+length(total_int)
+```
+
+```{r}
+# average across replicates
+data = as.data.frame(assay(rld))[total_int,]
+d0.WT.means = rowMeans(data[,1:2])
+d0.KO.means = rowMeans(data[,3:4])
+d7.WT.means = rowMeans(data[,5:6])
+d7.KO.means = rowMeans(data[,7:8])
+d21.WT.means = data[,9]
+d21.KO.means = rowMeans(data[,10:11])
+data_avg = data.frame(list(d0WT=d0.WT.means, d0KO=d0.KO.means, d7WT=d7.WT.means, d7KO=d7.KO.means, d21WT=d21.WT.means, d21KO=d21.KO.means))
+data_avg
+```
+
+```{r}
+# calculate fold changes
+d0.fc = data_avg$d0KO / data_avg$d0WT
+d7.fc = data_avg$d7KO / data_avg$d7WT
+d21.fc = data_avg$d21KO / data_avg$d21WT
+data_fc = data.frame(list(d0=d0.fc, d7=d7.fc, d21=d21.fc))
+rownames(data_fc) = rownames(data_avg)
+data_fc
+```
+
+```{r}
+write.table(data_fc, file="./nosva_v4/DPGP/data_fc_unscaled.txt", sep="\t", quote=FALSE, row.names = TRUE, col.names = TRUE)
+```
+
+```{r}
+# calculate z-scores
+data_zscore = t(data_fc) # scale works on columns, not rows
+data_zscore = scale(data_zscore, center=TRUE, scale=TRUE)
+data_zscore = as.data.frame(t(data_zscore)) # return data to original dimensions
+data_zscore
+```
+
+```{r}
+write.table(data_zscore, file="./nosva_v4/DPGP/data_zscore.txt", sep="\t", quote=FALSE, row.names = TRUE, col.names = TRUE)
+```
+
+# After DPGP clustering...
+```{r}
+# import resulting clusters from DPGP
+dpgp_clust = read.table(file="./nosva_v4/DPGP/DESeq2/_optimal_clustering.txt", sep="\t", header = TRUE)
+dpgp_clust$symbol = genes(edb, filter = GeneIdFilter(dpgp_clust$gene), columns = "symbol", return.type="data.frame")$symbol
+head(dpgp_clust)
+write.table(dpgp_clust, file="./nosva_v4/DPGP/DESeq2/dpgp_clusters.tsv", quote=FALSE, sep="\t", row.names=FALSE, col.names=TRUE)
+```
+
+```{r}
+# Plot time expression of each cluster
+# want to melt by gene symbol
+plot_df = data_zscore
+plot_df$geneid = rownames(plot_df)
+plot_df
+
+plot_df = melt(plot_df, id="geneid")
+plot_df$cluster = dpgp_clust$cluster[match(plot_df$geneid, dpgp_clust$gene)] # assign clusters to data_fc dataframe
+plot_df = plot_df[order(plot_df$cluster),]
+plot_df
+```
+
+```{r}
+plot_df_sd = matrix(ncol = length(unique(plot_df$cluster)), nrow = length(unique(plot_df$variable)))
+plot_df_mean = plot_df_sd
+for(i in 1:length(unique(plot_df$variable))){
+  for(j in 1:length(unique(plot_df$cluster))){
+     plot_df_sd[i,j] = sd(subset(plot_df, subset=cluster==j & variable==unique(plot_df$variable)[i])$value)
+     plot_df_mean[i,j] = mean(subset(plot_df, subset=cluster==j & variable==unique(plot_df$variable)[i])$value) 
+  }
+}
+colnames(plot_df_mean) = unique(plot_df$cluster)
+rownames(plot_df_mean) = unique(plot_df$variable)
+colnames(plot_df_sd) = unique(plot_df$cluster)
+rownames(plot_df_sd) = unique(plot_df$variable)
+
+plot_df_mean = melt(plot_df_mean)
+plot_df_sd = melt(plot_df_sd)
+
+ribbon = data.frame(day = plot_df_mean$Var1, cluster = plot_df_mean$Var2, 
+                    mean = plot_df_mean$value,
+                    ymin = plot_df_mean$value - 2*plot_df_sd$value, ymax = plot_df_mean$value + 2*plot_df_sd$value)
+ribbon
+```
+  geom_line(aes(x=day, y=mean)) +
+```{r}
+p = ggplot(data=ribbon, aes(x=day)) + 
+  geom_ribbon(aes(ymin=ymin, ymax=ymax, group=cluster), fill="gray") +
+  geom_line(aes(y=mean, size=0.01, group=cluster)) +
+  geom_point(aes(y=mean, size=1, stroke=0, color=factor(cluster))) + 
+  geom_hline(yintercept=0, lty=2) +
+  scale_color_brewer(palette="Paired")
+p = facet(p, facet.by = "cluster",
+          panel.labs = list(cluster=paste0("Cluster ",unique(ribbon$cluster), ", N=", table(dpgp_clust$cluster))),
+          panel.labs.background = list(color="black", fill="white"),
+          panel.labs.font = list(size=22, face="bold")) + 
+  theme(legend.position = "none")
+# strip.background = element_rect(colour="black", fill="gray95", size=1, linetype="solid"  
+# panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+p
+
+ggsave(p, filename="./nosva_v4/DPGP/DESeq2/l2fc_dpgp.tiff", units="in", height = 10, width=16, dpi=320)
+```
+
+# Functional annotation
+```{r}
+library(enrichR)
+```
+
+```{r}
+dbs_on <- listEnrichrDbs()
+# if (is.null(dbs)) websiteLive <- FALSE else websiteLive <- TRUE
+# if (websiteLive) head(dbs)
+dbs <- c("GO_Molecular_Function_2018", "GO_Cellular_Component_2018", "GO_Biological_Process_2018", "KEGG_2019_Mouse")
+```
+
+```{r}
+dpgp_clust_kegg = list()
+dpgp_clust_gobp = list()
+if (websiteLive) {
+  i=1
+  for(c in unique(dpgp_clust$cluster)){
+    enriched <- enrichr(subset(dpgp_clust, subset=cluster==c)$symbol, dbs) # run enrichR for genes in each cluster
+    dpgp_clust_kegg[[i]] = subset(enriched[["KEGG_2019_Mouse"]], subset=P.value<=0.05) # select KEGG terms with pval<0.05]
+    dpgp_clust_gobp[[i]] = subset(enriched[["GO_Biological_Process_2018"]], subset=P.value<=0.05)
+    #dpgp_clust_kegg[[i]] = dpgp_clust_kegg[[i]][order(dpgp_clust_kegg[[i]]$Combined.Score, decreasing=TRUE),] # order results by decreasing Combined.Score (pval*zscore)
+    i=i+1
+  }
+}
+```
+
+```{r}
+saveRDS(dpgp_clust_kegg, file = "./nosva_v4/RDS/dpgp_clust_kegg.RDS")
+saveRDS(dpgp_clust_gobp, file = "./nosva_v4/RDS/dpgp_clust_gobp.RDS")
+```
+
+```{r}
+dpgp_clust_kegg = readRDS("./nosva_v4/RDS/dpgp_clust_kegg.RDS")
+dpgp_clust_kegg
+```
+
+```{r}
+dpgp_clust_gobp = readRDS("./nosva_v4/RDS/dpgp_clust_gobp.RDS")
+dpgp_clust_gobp
+```
+
+# KEGG Term clustering
+```{r}
+dpgp_clust_kegg_df = data.frame()
+dpgp_clust_kegg_plotlist = list()
+
+for(i in 1:length(dpgp_clust_kegg)){
+  #top5 = head(dpgp_clust_kegg[[i]][order(-log10(dpgp_clust_kegg[[i]]$P.value),decreasing=TRUE),], 10)
+  top5 = dpgp_clust_kegg[[i]][order(-log10(dpgp_clust_kegg[[i]]$P.value),decreasing=TRUE),]
+  top5$cluster = rep(i, nrow(top5))
+  top5$cluster = factor(top5$cluster)
+  dpgp_clust_kegg_df = rbind(dpgp_clust_kegg_df, top5)
+  #print(top5)
+  # dpgp_clust_kegg_plotlist[[i]] = ggplot(data=top5, aes(x=reorder(factor(Term), order(-log10(P.value))),
+  #                                                       y=-log10(P.value),group=P.value), ) +
+  #   geom_bar(stat="identity") + coord_flip()
+}
+
+# ggplot(dpgp_clust_kegg_df, aes(x=Term, y=-log10(P.value),fill=cluster)) +
+#   geom_bar(stat="identity", position=position_dodge2(preserve = "single")) + coord_flip()
+
+kegg_clust_length = sort(table(dpgp_clust_kegg_df$Term), decreasing=TRUE)
+dpgp_clust_kegg_plot = ggplot(dpgp_clust_kegg_df, aes(x=factor(Term, levels=rev(names(kegg_clust_length))), y=-log10(P.value))) +
+  geom_bar(stat="identity", aes(fill=cluster)) +  
+  coord_flip() + theme_bw() +labs_pubr()
+dpgp_clust_kegg_plot
+ggsave(dpgp_clust_kegg_plot, filename = "./nosva_v4/DPGP/DESeq2/dpgp_clust_kegg_plot.tiff", units="in", 
+       height=10, width=7, dpi=320)
+
+# for(i in 1:length(dpgp_clust_kegg)){
+#   for(j in 1:nrow(dpgp_clust_kegg[[i]])){
+#     term = dpgp_clust_kegg[[i]]$Term[j]
+#     dpgp_clust_kegg_term[j,i] = term
+#     dpgp_clust_kegg_pval[j,i] = dpgp_clust_kegg[[i]]$P.value[j]
+#   }
+# }
+# 
+# dpgp_clust_kegg_term
+# dpgp_clust_kegg_pval
+# 
+# dpgp_clust_kegg_df = cbind(as.matrix(dpgp_clust_kegg_term), as.matrix(dpgp_clust_kegg_pval))
+# dpgp_clust_kegg_df = dpgp_clust_kegg_df[,order(colnames(dpgp_clust_kegg_df))]
+# dpgp_clust_kegg_df = as.data.frame(dpgp_clust_kegg_df)
+# dpgp_clust_kegg_df
+```
+
+# GO Term clustering
+```{r}
+dpgp_clust_gobp_term = data.frame()
+dpgp_clust_gobp_pval = data.frame()
+
+for(i in 1:length(dpgp_clust_gobp)){
+  for(j in 1:nrow(dpgp_clust_gobp[[i]])){
+    term = strsplit(dpgp_clust_gobp[[i]]$Term[j], " ")[[1]]
+    term = term[length(term)]
+    dpgp_clust_gobp_term[j,i] = substr(term, 2, 11)
+    dpgp_clust_gobp_pval[j,i] = dpgp_clust_gobp[[i]]$P.value[j]
+  }
+}
+
+dpgp_clust_gobp_term
+dpgp_clust_gobp_pval
+
+dpgp_clust_gobp_df = cbind(as.matrix(dpgp_clust_gobp_term), as.matrix(dpgp_clust_gobp_pval))
+dpgp_clust_gobp_df = dpgp_clust_gobp_df[,order(colnames(dpgp_clust_gobp_df))]
+dpgp_clust_gobp_df = as.data.frame(dpgp_clust_gobp_df)
+dpgp_clust_gobp_df
+```
+
+```{r}
+write.table(dpgp_clust_gobp_df, file="./nosva_v4/DPGP/DESeq2/dpgp_clust_gobp.csv", sep=",", quote = FALSE, col.names = TRUE, row.names = FALSE)
+```
+
+# REVIGO Cluster plotting
+```{r}
+c1_rev = read.table("./nosva_v4/DPGP/DESeq2/REVIGO/c1_REVIGO_scatter_tiny.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+c2_rev = read.table("./nosva_v4/DPGP/DESeq2/REVIGO/c2_REVIGO_scatter_tiny.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+c3_rev = read.table("./nosva_v4/DPGP/DESeq2/REVIGO/c3_REVIGO_scatter_small.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+c4_rev = read.table("./nosva_v4/DPGP/DESeq2/REVIGO/c4_REVIGO_scatter_small.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+c5_rev = read.table("./nosva_v4/DPGP/DESeq2/REVIGO/c5_REVIGO_scatter_small.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+c6_rev = read.table("./nosva_v4/DPGP/DESeq2/REVIGO/c6_REVIGO_scatter_med.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+c7_rev = read.table("./nosva_v4/DPGP/DESeq2/REVIGO/c7_REVIGO_scatter_med.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+c8_rev = read.table("./nosva_v4/DPGP/DESeq2/REVIGO/c8_REVIGO_scatter_small.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+c9_rev = read.table("./nosva_v4/DPGP/DESeq2/REVIGO/c9_REVIGO_scatter_med.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+c10_rev = read.table("./nosva_v4/DPGP/DESeq2/REVIGO/c10_REVIGO_scatter_Large.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+c11_rev = read.table("./nosva_v4/DPGP/DESeq2/REVIGO/c11_REVIGO_scatter_med.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+```
+
+```{r}
+# isolate coarse GO terms
+c1_rev_data <- c1_rev [(c1_rev$plot_X != "null" & c1_rev$plot_Y != "null"), ];
+c2_rev_data <- c2_rev [(c2_rev$plot_X != "null" & c2_rev$plot_Y != "null"), ];
+c3_rev_data <- c3_rev [(c3_rev$plot_X != "null" & c3_rev$plot_Y != "null"), ];
+c4_rev_data <- c4_rev [(c4_rev$plot_X != "null" & c4_rev$plot_Y != "null"), ];
+c5_rev_data <- c5_rev [(c5_rev$plot_X != "null" & c5_rev$plot_Y != "null"), ];
+c6_rev_data <- c6_rev [(c6_rev$plot_X != "null" & c6_rev$plot_Y != "null"), ];
+c7_rev_data <- c7_rev [(c7_rev$plot_X != "null" & c7_rev$plot_Y != "null"), ];
+c8_rev_data <- c8_rev [(c8_rev$plot_X != "null" & c8_rev$plot_Y != "null"), ];
+c9_rev_data <- c9_rev [(c9_rev$plot_X != "null" & c9_rev$plot_Y != "null"), ];
+c10_rev_data <- c10_rev [(c10_rev$plot_X != "null" & c10_rev$plot_Y != "null"), ];
+c11_rev_data <- c11_rev [(c11_rev$plot_X != "null" & c11_rev$plot_Y != "null"), ];
+```
+
+```{r}
+# collect coarse GO terms into a single data frame
+total_rev_data = rbind(c1_rev_data, c2_rev_data, c3_rev_data, c4_rev_data, c5_rev_data, c6_rev_data, c7_rev_data, c8_rev_data, c9_rev_data, c10_rev_data, c11_rev_data)
+
+total_rev_data$cluster = c(rep(1, nrow(c1_rev_data)), rep(2, nrow(c2_rev_data)), rep(3, nrow(c3_rev_data)), rep(4, nrow(c4_rev_data)), rep(5, nrow(c5_rev_data)), rep(6, nrow(c6_rev_data)), rep(7, nrow(c7_rev_data)), rep(8, nrow(c8_rev_data)), rep(9, nrow(c9_rev_data)), rep(10, nrow(c10_rev_data)), rep(11, nrow(c11_rev_data)))
+
+total_rev_data
+```
+
+```{r}
+# assign column types
+total_rev_data$plot_X <- as.numeric( as.character(total_rev_data$plot_X) );
+total_rev_data$plot_Y <- as.numeric( as.character(total_rev_data$plot_Y) );
+total_rev_data$plot_size <- as.numeric( as.character(total_rev_data$plot_size) );
+total_rev_data$log10.p.value <- -as.numeric( as.character(total_rev_data$log10.p.value) );
+total_rev_data$frequency <- as.numeric( lapply(total_rev_data$frequency, function(x) { substr(as.character(x), 1, 5) })); # remove percentage sign
+total_rev_data$uniqueness <- as.numeric( as.character(total_rev_data$uniqueness) );
+total_rev_data$dispensability <- as.numeric( as.character(total_rev_data$dispensability) );
+total_rev_data
+```
+
+```{r}
+require("ggrepel")
+library("wesanderson")
+
+pal <- wes_palette("Zissou1", 100, type = "continuous")
+
+for(i in 1:length(unique(total_rev_data$cluster))){
+  
+  cl_data = data.frame(subset(total_rev_data, subset=cluster==i))
+  
+  ex <- data.frame(subset(cl_data, subset=dispensability<0.125))
+  
+  p = ggplot(data=cl_data)
+  p = p + geom_point( aes( plot_X, plot_Y, colour = log10.p.value, size = plot_size), alpha = 0.6 ) + scale_size_area()
+  p = p + scale_colour_gradientn(colours = pal, limits=(c(1, max(total_rev_data$log10.p.value))), breaks=c(2,3,4,5))
+  p = p + geom_point( aes(plot_X, plot_Y, size = plot_size), shape = 21, fill = "transparent", colour = I (alpha ("black", 0.6) )) +
+    scale_size_area()
+  p = p + scale_size(range=c(1,30)) + theme_bw()
+  p = p + geom_label_repel( data = ex, aes(plot_X, plot_Y, label = description, fontface="bold"),
+                       colour = "black", size=5, nudge_y=-0.75, force=3, segment.size = 1)
+  p = p + labs (y = "semantic space x", x = "semantic space y");
+  p = p + theme(legend.key = element_blank(), legend.position = "right", legend.key.size = unit(1,"cm"), 
+                legend.key.width = unit(0.75,"cm"), axis.text.x=element_text(size=12), axis.text.y=element_text(size=12),
+                legend.justification = "top", axis.title.x=element_blank(), axis.title.y=element_blank())
+  p = p + guides(size=FALSE)
+
+  one.x_range = max(cl_data$plot_X) - min(cl_data$plot_X);
+  one.y_range = max(cl_data$plot_Y) - min(cl_data$plot_Y);
+  p = p + xlim(min(cl_data$plot_X)-one.x_range/10,max(cl_data$plot_X)+one.x_range/10);
+  p = p + ylim(min(cl_data$plot_Y)-one.y_range/10,max(cl_data$plot_Y)+one.y_range/10);
+  
+  print(p)
+  ggsave(p, filename=sprintf("./nosva_v4/DPGP/DESeq2/REVIGO/c%d_scatter.tiff", i), units="in", width=10, height=10, dpi=320)
+}
+
+# c1_p <- ggplot( data = subset(cl_data, subset=cluster==2) );
+# c1_p <- c1_p + geom_point( aes( plot_X, plot_Y, colour = log10.p.value, size = plot_size), alpha = 0.6 ) + scale_size_area();
+# 
+# pal <- wes_palette("Zissou1", 100, type = "continuous");
+# c1_p <- c1_p + scale_colour_gradientn(colours = pal);
+# # p <- p + scale_colour_distiller(palette="rainbow")
+# # p <- p + scale_color_continuous(type="viridis");
+# 
+# c1_p <- c1_p + geom_point( aes(plot_X, plot_Y, size = plot_size), shape = 21, fill = "transparent", colour = I (alpha ("black", 0.6) )) + scale_size_area();
+# c1_p <- c1_p + scale_size( range=c(1,25)) + 
+#   theme_bw(); # + scale_fill_gradientn(colours = heat_hcl(7), limits = c(-300, 0) );
+# 
+# ex <- subset(total_rev_data, subset=cluster==2) [ subset(total_rev_data, subset=cluster==2)$dispensability < 0.15, ];
+# c1_p <- c1_p + geom_label_repel( data = ex, aes(plot_X, plot_Y, label = description, fontface="bold"), 
+#                        colour = "black", size=5, nudge_y=-0.75, force=3, segment.size = 1);
+# 
+# c1_p <- c1_p + labs (y = "semantic space x", x = "semantic space y");
+# c1_p <- c1_p + theme(legend.key = element_blank()) ;
+# 
+# one.x_range = max(total_rev_data$plot_X) - min(total_rev_data$plot_X);
+# one.y_range = max(total_rev_data$plot_Y) - min(total_rev_data$plot_Y);
+# c1_p <- c1_p + xlim(min(total_rev_data$plot_X)-one.x_range/10,max(total_rev_data$plot_X)+one.x_range/10);
+# c1_p <- c1_p + ylim(min(total_rev_data$plot_Y)-one.y_range/10,max(total_rev_data$plot_Y)+one.y_range/10);
+# 
+# c1_p
+# ggsave(c1_p, filename="./nosva_v4/DPGP/DESeq2/REVIGO/c1_scatter.tiff", units="in", width=10, height=10, dpi=320)
+```
+

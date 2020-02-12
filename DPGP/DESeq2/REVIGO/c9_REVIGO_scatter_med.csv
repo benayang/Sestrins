@@ -1,0 +1,64 @@
+term_ID,description,frequency,plot_X,plot_Y,plot_size,log10 p-value,uniqueness,dispensability,representative,eliminated
+GO:0048666,"neuron development",4.768%, 6.281,-2.902,3.002,-2.1816,0.764,0.000,48666,0
+GO:0010466,"negative regulation of peptidase activity",1.344%, 3.641, 5.238,2.453,-1.9292,0.740,0.019,10466,0
+GO:0010951,"negative regulation of endopeptidase activity",1.277%,null,null,2.431,-1.6893,0.741,0.923,10466,1
+GO:0052548,"regulation of endopeptidase activity",1.928%,null,null,2.610,-1.8527,0.777,0.920,10466,1
+GO:0006610,"ribosomal protein import into nucleus",0.038%,-5.382,-4.860,0.954,-1.7350,0.844,0.026,6610,0
+GO:0046598,"positive regulation of viral entry into host cell",0.033%,-7.125, 1.628,0.903,-1.6776,0.866,0.051,46598,0
+GO:0098976,"excitatory chemical synaptic transmission",0.005%,-1.277,-1.128,0.301,-1.7350,0.890,0.060,98976,0
+GO:0090527,"actin filament reorganization",0.028%, 1.082,-7.577,0.845,-1.6270,0.907,0.070,90527,0
+GO:0050678,"regulation of epithelial cell proliferation",1.429%, 1.629,-5.293,2.480,-1.8056,0.873,0.073,50678,0
+GO:0050680,"negative regulation of epithelial cell proliferation",0.594%,null,null,2.100,-1.8774,0.847,0.850,50678,1
+GO:0000086,"G2/M transition of mitotic cell cycle",0.461%, 1.354,-0.332,1.991,-1.3561,0.919,0.093,86,0
+GO:0044839,"cell cycle G2/M phase transition",0.494%,null,null,2.021,-1.3500,0.890,0.757,86,1
+GO:0048011,"neurotrophin TRK receptor signaling pathway",0.138%,-1.293, 2.506,1.477,-1.6270,0.856,0.095,48011,0
+GO:0030311,"poly-N-acetyllactosamine biosynthetic process",0.024%,-1.040, 5.558,0.778,-1.6270,0.830,0.097,30311,0
+GO:0033692,"cellular polysaccharide biosynthetic process",0.247%,null,null,1.724,-1.3081,0.818,0.812,30311,1
+GO:0000184,"nuclear-transcribed mRNA catabolic process, nonsense-mediated decay",0.171%,-0.392, 6.765,1.568,-1.4487,0.876,0.116,184,0
+GO:0051290,"protein heterotetramerization",0.100%,-1.225,-3.747,1.342,-1.3081,0.932,0.126,51290,0
+GO:0007205,"protein kinase C-activating G-protein coupled receptor signaling pathway",0.095%,-3.164, 0.682,1.322,-1.5038,0.892,0.127,7205,0
+GO:1901798,"positive regulation of signal transduction by p53 class mediator",0.114%,-6.478, 1.010,1.398,-1.3553,0.863,0.156,1901798,0
+GO:0048227,"plasma membrane to endosome transport",0.033%,-2.487,-7.262,0.903,-1.6776,0.897,0.157,48227,0
+GO:0090257,"regulation of muscle system process",0.897%, 3.717,-2.735,2.279,-1.6270,0.854,0.160,90257,0
+GO:0015693,"magnesium ion transport",0.071%,-3.848,-5.697,1.204,-1.5410,0.900,0.165,15693,0
+GO:0009249,"protein lipoylation",0.014%, 5.820, 4.411,0.602,-1.6776,0.900,0.181,9249,0
+GO:0046339,"diacylglycerol metabolic process",0.081%, 3.624, 1.076,1.255,-1.4696,0.884,0.183,46339,0
+GO:0018065,"protein-cofactor linkage",0.028%, 4.916, 4.702,0.845,-1.5818,0.897,0.191,18065,0
+GO:1903426,"regulation of reactive oxygen species biosynthetic process",0.323%, 1.536, 6.330,1.839,-1.3811,0.866,0.195,1903426,0
+GO:0030878,"thyroid gland development",0.123%, 5.709,-4.770,1.431,-1.5818,0.835,0.253,30878,0
+GO:0006590,"thyroid hormone generation",0.047%,-5.017, 4.278,1.041,-1.5818,0.872,0.272,6590,0
+GO:0046323,"glucose import",0.347%,-4.693,-5.700,1.869,-1.6270,0.861,0.282,46323,0
+GO:0035235,"ionotropic glutamate receptor signaling pathway",0.114%,-4.399, 2.700,1.398,-1.6270,0.871,0.286,35235,0
+GO:0001823,"mesonephros development",0.537%, 6.883,-2.494,2.057,-1.5410,0.829,0.298,1823,0
+GO:0045471,"response to ethanol",0.632%, 1.357, 2.807,2.127,-1.4380,0.935,0.304,45471,0
+GO:0045893,"positive regulation of transcription, DNA-templated",6.515%,-2.289, 5.371,3.138,-1.5597,0.782,0.316,45893,0
+GO:0051216,"cartilage development",0.912%, 5.985,-4.234,2.286,-2.1792,0.779,0.319,51216,0
+GO:0061036,"positive regulation of cartilage development",0.142%,null,null,1.491,-1.3553,0.748,0.852,51216,1
+GO:0061035,"regulation of cartilage development",0.304%,null,null,1.813,-1.4086,0.759,0.829,51216,1
+GO:0032332,"positive regulation of chondrocyte differentiation",0.090%,null,null,1.301,-1.5410,0.734,0.743,51216,1
+GO:0071985,"multivesicular body sorting pathway",0.028%,-3.643,-6.611,0.845,-1.4696,0.877,0.319,71985,0
+GO:0000028,"ribosomal small subunit assembly",0.081%,-0.374,-5.043,1.255,-1.3081,0.960,0.355,28,0
+GO:0051146,"striated muscle cell differentiation",1.263%, 5.043,-5.267,2.427,-1.3081,0.810,0.370,51146,0
+GO:0014902,"myotube differentiation",0.518%,null,null,2.041,-1.4086,0.820,0.807,51146,1
+GO:0030097,"hemopoiesis",3.956%, 6.015,-3.615,2.921,-1.7612,0.781,0.393,30097,0
+GO:1903707,"negative regulation of hemopoiesis",0.603%,null,null,2.107,-1.4380,0.739,0.730,30097,1
+GO:0060079,"excitatory postsynaptic potential",0.480%,-4.777, 1.490,2.009,-1.3081,0.804,0.465,60079,0
+GO:2000463,"positive regulation of excitatory postsynaptic potential",0.109%,null,null,1.380,-1.3081,0.793,0.861,60079,1
+GO:0006613,"cotranslational protein targeting to membrane",0.085%,-4.719,-4.667,1.279,-1.5972,0.809,0.468,6613,0
+GO:0048935,"peripheral nervous system neuron development",0.047%, 6.735,-1.430,1.041,-1.8014,0.829,0.495,48935,0
+GO:0045047,"protein targeting to ER",0.114%,-5.444,-4.556,1.398,-1.5634,0.854,0.505,45047,0
+GO:0006614,"SRP-dependent cotranslational protein targeting to membrane",0.071%,null,null,1.204,-1.6327,0.798,0.943,45047,1
+GO:0038179,"neurotrophin signaling pathway",0.176%,-3.146, 2.361,1.580,-1.3553,0.854,0.543,38179,0
+GO:0032509,"endosome transport via multivesicular body sorting pathway",0.057%,-2.102,-7.400,1.114,-1.5038,0.901,0.577,32509,0
+GO:0060402,"calcium ion transport into cytosol",0.575%,-5.250,-3.830,2.086,-1.3081,0.779,0.618,60402,0
+GO:1904591,"positive regulation of protein import",0.456%,-5.645,-3.437,1.987,-1.4086,0.793,0.626,1904591,0
+GO:0019083,"viral transcription",0.195%,-3.263, 5.882,1.623,-1.4417,0.846,0.630,19083,0
+GO:0019080,"viral gene expression",0.242%,null,null,1.716,-1.4630,0.868,0.927,19083,1
+GO:0007420,"brain development",3.433%, 6.152,-2.960,2.860,-1.4009,0.785,0.636,7420,0
+GO:0030309,"poly-N-acetyllactosamine metabolic process",0.024%,-1.480, 5.395,0.778,-1.5818,0.870,0.656,30309,0
+GO:0060192,"negative regulation of lipase activity",0.071%, 5.687, 3.014,1.204,-1.6776,0.875,0.658,60192,0
+GO:0007417,"central nervous system development",4.359%, 6.239,-2.524,2.963,-1.7027,0.799,0.660,7417,0
+GO:0048538,"thymus development",0.266%, 6.242,-4.098,1.756,-1.4380,0.810,0.665,48538,0
+GO:2000059,"negative regulation of protein ubiquitination involved in ubiquitin-dependent protein catabolic process",0.071%, 3.152, 5.748,1.204,-1.5410,0.770,0.693,2000059,0
+GO:1903051,"negative regulation of proteolysis involved in cellular protein catabolic process",0.214%,null,null,1.663,-1.3081,0.769,0.888,2000059,1
+GO:0051444,"negative regulation of ubiquitin-protein transferase activity",0.076%,null,null,1.230,-1.4696,0.796,0.792,2000059,1

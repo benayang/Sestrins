@@ -253,8 +253,10 @@ write.csv(resLFC_d21_Up_Sig0.01, file="./nosva_v4/d21_sig0.01_up_l2fc1.csv")
 library("genefilter")
 library("pheatmap")
 library("RColorBrewer")
-topVarGenes <- head(order(rowVars(assay(rld)), decreasing = TRUE), 50)
-topVarGenes <- order(rowVars(assay(rld)), decreasing = TRUE)
+
+#topVarGenes <- head(order(rowVars(assay(rld)), decreasing = TRUE), 50)
+topVarGenes <- unlist(lapply(unique(unlist(d0_d7_d21_int)), FUN = function(x) {match(x,rownames(assay(rld)))}))
+
 mat  <- assay(rld)[ topVarGenes, ]
 #mat  <- mat - rowMeans(mat)
 topVarGeneSymbols = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(mat)), return.type="data.frame")$symbol
@@ -263,14 +265,21 @@ anno <- as.data.frame(colData(rld)[, c("condition","day")])
 #rownames(anno) = colnames(mat)
 # col.pal <- RColorBrewer::brewer.pal(5, "Reds")
 
+# hmp = pheatmap(mat, annotation_col = anno, scale="row", 
+#                color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(200),
+#                show_colnames = FALSE, show_rownames = TRUE, fontsize_row = 8,
+#                cellwidth = 40, cellheight = 9, border_color = NA,
+#                cluster_rows = TRUE, cluster_cols = FALSE, treeheight_row = 0,
+#                annotation_legend = FALSE, legend = TRUE) 
+
 hmp = pheatmap(mat, annotation_col = anno, scale="row", 
                color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(200),
-               show_colnames = FALSE, show_rownames = TRUE, fontsize_row = 8,
-               cellwidth = 40, cellheight = 9, border_color = NA,
+               show_colnames = FALSE, show_rownames = FALSE, fontsize_row = 8,
+               cellwidth = 40, cellheight=0.4, border_color = NA,
                cluster_rows = TRUE, cluster_cols = FALSE, treeheight_row = 0,
                annotation_legend = FALSE, legend = TRUE) 
 
-ggsave(hmp, filename="./nosva_v4/Figures/Top50Var_rld_KOvsWT_pheatmap.tiff", units="in", width=7.25, height=6.75, dpi=320)
+ggsave(hmp, filename="./nosva_v4/Figures/DE_rld_KOvsWT_pheatmap.tiff", units="in", width=7, height=6.5, dpi=200, limitsize = FALSE)
 ```
 
 ```{r fig.height=8}
@@ -312,7 +321,7 @@ library(ggVennDiagram)
 d0_d7_d21_int = list(d0=rownames(subset(resLFC_d0, subset=(padj<=0.01 & abs(log2FoldChange)>=1))),
                      d7=rownames(subset(resLFC_d7, subset=(padj<=0.01 & abs(log2FoldChange)>=1))),
                      d21=rownames(subset(resLFC_d21, subset=(padj<=0.01 & abs(log2FoldChange)>=1))))
-d0_d7_d21_venn = ggVennDiagram(d0_d7_d21_int, lty=1, lwd=0.75, color="black") + theme(text=element_text(size=16, family="sans"))
+d0_d7_d21_venn = ggVennDiagram(d0_d7_d21_int, lty=1, lwd=1, color="black") + theme(text=element_text(size=16, family="sans"))
 d0_d7_d21_venn_nolabel = ggVennDiagram(d0_d7_d21_int, lty=1, lwd=0.75, color="black", label=NULL) + 
   theme(text=element_text(size=16, family="sans"))
 d0_d7_d21_venn
@@ -472,16 +481,15 @@ total_geneList = lapply(total_geneList, function(x) x[!is.na(x)])
 # total_geneList = list(Qui=gene_xlsx$Quiescence, CC=gene_xlsx$Cell_Cycle, Infl=gene_xlsx$Inflammation, Neur=gene_xlsx$NeurDev, 
 #                       Adh=gene_xlsx$Adhesion, Myo=gene_xlsx$Myogenesis, Chr=gene_xlsx$Chromatin, Wnt=gene_xlsx$Wnt, ROS=gene_xlsx$ROS)
 
-total_geneList_stack = stack(total_geneList)
+total_geneList_stack = as.data.frame(stack(total_geneList))
 
-total_geneList_ens = genes(edb, columns="symbol", filter=SymbolFilter(unlist(total_geneList)), return.type="data.frame")$gene_id
+total_geneList_ens = genes(edb, columns="gene_id", filter=SymbolFilter(unlist(total_geneList)), return.type="data.frame")$gene_id
 gene_df = resLFC_d0[total_geneList_ens,]
 gene_df$Cluster = total_geneList_stack$ind[match(gene_df$Symbol, total_geneList_stack$values)]
-levels(gene_df$Cluster) = c("Qui", "NP", "Infl", "Neur", "Adh", "Myo", "Chr", "Wnt", "ROS")
 
 gene_df = subset(as.data.frame(gene_df), select=c("Symbol", "log2FoldChange", "padj", "lfcSE", "Cluster"))
 gene_df$log10padj = -log10(gene_df$padj)
-gene_df = subset(gene_df, subset = padj<0.1)
+# gene_df = subset(gene_df, subset = padj<0.1)
 gene_df = gene_df[order(gene_df$Cluster),]
 gene_df
 ```
@@ -527,52 +535,90 @@ d21_geneList$log10padj = -log10(d21_geneList$padj)
 #d21_geneList = subset(d21_geneList, subset = padj<0.1)
 
 total_df = rbind(d0_geneList, d7_geneList, d21_geneList)
-total_df
+total_df = subset(total_df, subset = padj<0.05)
 ```
 
 ```{r}
-total_bar = ggbarplot(total_df, x="Symbol", y="log2FoldChange", 
-          fill="log10padj", color="day", 
-          position=position_dodge(), 
-          rotate=TRUE) +
+Qui_d0_subset = subset(total_df, subset = (Cluster=="Qui" & day=="d0"))
+Qui_d0_bar = ggbarplot(Qui_d0_subset, x="Symbol", y="log2FoldChange",
+                    fill = "log10padj", color = "white",
+                    sort.val = "asc", sort.by.groups = TRUE) + 
   gradient_fill("RdBu") +
-  labs_pubr()
-total_bar
-ggexport(total_bar, filename="./nosva_v4/Figures/total_bar.tiff")
+  coord_flip() +
+  scale_x_discrete(position = "left") +
+  labs_pubr() +
+  geom_errorbar(data=Qui_d0_subset, aes(x=Symbol, ymin=log2FoldChange-lfcSE, ymax=log2FoldChange+lfcSE), width=0.4, size=1)
+  
+
+Qui_d0_bar = ggpar(Qui_d0_bar, legend = c(0.15,0.80), legend.title = "-log10(padj)", font.legend = c(14),
+                font.xtickslab = 14, font.ytickslab = 12, 
+                orientation = "horiz", xlab = FALSE, ylab = FALSE)
+
+Qui_d0_bar
+
+ggexport(Qui_d0_bar, filename="./nosva_v4/Figures/Qui_d0_bar.tiff", width=500, height=700, res=100)
 ```
 
 ```{r}
-d0_bar = ggbarplot(d0_geneList, x="Symbol", y="log2FoldChange",
-                    fill = "log10padj", color = "white",
-                    sort.val = "asc", sort.by.groups = TRUE,
-                    merge = TRUE) + 
-  gradient_fill("RdBu") +
-  coord_flip() +
-  scale_x_discrete(position = "left") +
-  labs_pubr()
+Qui_barplot_list = list()
+# colfunc <- colorRampPalette(c("#d6604d","#f7f7f7", "#4393c3"))
+# plot(rep(1,10),col=colfunc(10),pch=19,cex=3)
+# low="#67001F", high="#053061",
+for(i in 1:length(levels(total_df$day))){
+  Qui_subset = subset(total_df, subset = (Cluster=="Qui" & day==levels(total_df$day)[i]))
+  p = ggbarplot(Qui_subset, x="Symbol", y="log2FoldChange",
+                fill = "log10padj", color="white",
+                sort.val = "asc", sort.by.groups = TRUE) +
+    scale_fill_gradientn(colours=brewer.pal(n=11, name="RdBu"), limits = c(0,18), breaks = seq(0,18,4)) +
+    coord_flip() +
+    scale_x_discrete(position = "left") +
+    scale_y_discrete(limits=c(-2,1.5), breaks=seq(-2,2,length.out=5)) +
+    geom_errorbar(data=Qui_subset, 
+                  aes(x=Symbol, ymin=log2FoldChange-lfcSE, ymax=log2FoldChange+lfcSE), 
+                  width=0.4, size=1) +
+    labs_pubr()
+  p = ggpar(p, legend = c(0.15,0.80), legend.title = "-log10(padj)", font.legend = c(12),
+                font.xtickslab = 14, font.ytickslab = 12, 
+                orientation = "horiz", xlab = FALSE, ylab = FALSE)
+  Qui_barplot_list[[i]] = p
+}
 
-d7_bar = ggbarplot(d7_geneList, x="Symbol", y="log2FoldChange",
-                    fill = "log10padj", color = "white",
-                    sort.val = "asc", sort.by.groups = TRUE,
-                    merge = TRUE) + 
-  gradient_fill("RdBu") +
-  coord_flip() +
-  scale_x_discrete(position = "left") +
-  labs_pubr()
+ggarrange(plotlist = Qui_barplot_list, ncol=3, nrow=1, common.legend=TRUE)
+```
 
-d21_bar = ggbarplot(d7_geneList, x="Symbol", y="log2FoldChange",
-                    fill = "log10padj", color = "white",
-                    sort.val = "asc", sort.by.groups = TRUE,
-                    merge = TRUE) + 
-  gradient_fill("RdBu") +
-  coord_flip() +
-  scale_x_discrete(position = "left") +
-  labs_pubr()
+```{r}
+Myo_barplot_list = list()
+# colfunc <- colorRampPalette(c("#d6604d","#f7f7f7", "#4393c3"))
+# plot(rep(1,10),col=colfunc(10),pch=19,cex=3)
+# low="#67001F", high="#053061",
+for(i in 1:length(levels(total_df$day))){
+  Myo_subset = subset(total_df, subset = (Cluster=="Myo" & day==levels(total_df$day)[i]))
+  p = ggbarplot(Myo_subset, x="Symbol", y="log2FoldChange",
+                fill = "log10padj", color="white",
+                sort.val = "asc", sort.by.groups = TRUE) +
+    scale_fill_gradientn(colours=brewer.pal(n=11, name="RdBu"), limits = c(0,10)) +
+    coord_flip() +
+    scale_x_discrete(position = "left") +
+    scale_y_discrete(limits=c(-2,1.5), breaks=seq(-2,2,length.out=5)) +
+    geom_errorbar(data=Myo_subset, 
+                  aes(x=Symbol, ymin=log2FoldChange-lfcSE, ymax=log2FoldChange+lfcSE), 
+                  width=0.4, size=1) +
+    labs_pubr()
+  p = ggpar(p, legend = c(0.15,0.80), legend.title = "-log10(padj)", font.legend = c(12),
+                font.xtickslab = 14, font.ytickslab = 12, 
+                orientation = "horiz", xlab = FALSE, ylab = FALSE)
+  Myo_barplot_list[[i]] = p
+}
 
-all_bar = ggarrange(d0_bar, d7_bar, d21_bar)
-all_bar = ggpar(all_bar, font.xtickslab = 5, font.ytickslab = 5, font.x = 5, font.y=5)
-all_bar
-ggsave(all_bar, filename="./nosva_v4/Figures/all_bar.tiff", width=8, height=9, units="in", dpi=90)
+ggarrange(plotlist = Myo_barplot_list,common.legend=TRUE)
+```
+
+# Term "Scores"
+```{r}
+Qui_names = rownames(subset(total_df, subset=(Cluster=="Qui")))
+counts(dds, normalized=TRUE)[which(rownames(counts(dds, normalized=TRUE))==Qui_names),]
+aggregate(log2FoldChange~day, data=subset(total_df, subset=(Cluster=="Qui"), select=c("day","log2FoldChange")), FUN=median)
+aggregate(log2FoldChange~day, data=subset(total_df, subset=(Cluster=="CC"), select=c("day","log2FoldChange")), FUN=sum)
 ```
 
 ```{r}
@@ -586,9 +632,38 @@ gene_line = ggpar(gene_line, legend="none")
 gene_line
 ggexport(gene_line, filename="./nosva_v4/Figures/gene_line.tiff", width=400,height=400, dpi=320)
 ```
+
+# Plot counts over time
 ```{r}
-ggscatter(total_df,  x="day",y="log2FoldChange", facet.by="Cluster", color="Cluster",
-          add="reg.line", conf.int = TRUE,cor.coef = TRUE)
+#myo_gene_counts = counts(dds,normalized=TRUE)[rownames(subset(gene_df, subset=Cluster=="Myo")),]
+myo_gene_counts = assay(rld)[rownames(subset(gene_df, subset=Cluster=="Myo")),]
+#myo_gene_counts = rbind(myo_gene_counts, assay(rld)["ENSMUSG00000079471",])
+#rownames(myo_gene_counts)[length(rownames(myo_gene_counts))] = "ENSMUSG00000079471"
+colnames(myo_gene_counts) = sampleTable$sample
+
+myo_gene_counts_stack = stack(myo_gene_counts)
+colnames(myo_gene_counts_stack) = c("geneid", "sample", "counts")
+myo_gene_counts_stack = as.data.frame(myo_gene_counts_stack)
+myo_gene_counts_stack$day = unlist(lapply(myo_gene_counts_stack$sample, 
+                                   FUN = function(x) {unlist(paste0(strsplit(as.character(x),split="-")[[1]][1],
+                                                                    strsplit(as.character(x),split="-")[[1]][2]))}))
+myo_gene_counts_stack$condition = unlist(lapply(myo_gene_counts_stack$sample, 
+                                                FUN = function(x) {strsplit(as.character(x), split="-")[[1]][3]}))
+myo_gene_counts_stack$symbol = as.factor(genes(edb, columns="symbol",
+                                               filter=GeneIdFilter(myo_gene_counts_stack$geneid[1:(nrow(myo_gene_counts_stack)-1)]), 
+                                               return.type="data.frame")$symbol)
+levels(myo_gene_counts_stack$symbol) = c("Myod1", "Myog", "Myf5", "Mef2c", "Myh1", "Myh3", "Myh4", "Tmem8c", "Gm7325")
+myo_gene_counts_stack
+
+myo_gene_line = ggline(myo_gene_counts_stack, x="day", y="counts", facet.by = "symbol",
+                       color="condition", add=c("mean","boxplot","jitter"), 
+                       size=1, palette="lancet",
+                       ylim=c(4,15)) +
+  labs_pubr()
+myo_gene_line = ggpar(myo_gene_line, xlab = "Day", ylab = "rlog-transformed Counts", legend="none", panel.labs.font="bold")
+myo_gene_line
+
+#ggexport(myo_gene_line, filename="./nosva_v4/Figures/myo_gene_line.tiff", width = 1200, height=1000, res=200)
 ```
 
 
