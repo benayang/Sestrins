@@ -1,0 +1,299 @@
+---
+title: "Sestrin Pathway Figures"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
+library(tibble)
+library(enrichR)
+library(Hmisc)
+```
+
+```{r}
+setwd("C:/Users/NOBEL/Box/Lab Notes/Lab Notes Benjamin/Sestrins/Mouse RNA-Seq")
+```
+
+```{r}
+up_tab = read.table("./nosva_v4/d0_sig0.01_up_l2fc1.csv", sep=",", header = TRUE, stringsAsFactors = FALSE)
+down_tab = read.table("./nosva_v4/d0_sig0.01_down_l2fc1.csv", sep=",", header = TRUE, stringsAsFactors = FALSE)
+head(up_tab)
+```
+
+```{r}
+up_enrich = enrichr(up_tab$Symbol[1:100], c("GO_Molecular_Function_2018", "GO_Cellular_Component_2018", "GO_Biological_Process_2018", "KEGG_2019_Mouse"))
+up_enrich_kegg = subset(up_enrich[["KEGG_2019_Mouse"]], subset=P.value<0.05)
+up_enrich_kegg$log10pval = -log10(up_enrich_kegg$P.value)
+up_enrich_cs = up_enrich_kegg[order(as.numeric(up_enrich_kegg$Combined.Score), decreasing=TRUE),]
+up_enrich_pval = up_enrich_kegg[order(as.numeric(up_enrich_kegg$P.value), decreasing=FALSE),]
+up_enrich_cs
+up_enrich_pval
+```
+
+```{r}
+down_enrich = enrichr(down_tab$Symbol[1:100], c("GO_Molecular_Function_2018", "GO_Cellular_Component_2018", "GO_Biological_Process_2018", "KEGG_2019_Mouse"))
+down_enrich_kegg = subset(down_enrich[["KEGG_2019_Mouse"]], subset=P.value<0.05)
+down_enrich_kegg$log10pval = -log10(down_enrich_kegg$P.value)
+down_enrich_cs = down_enrich_kegg[order(as.numeric(down_enrich_kegg$Combined.Score), decreasing=TRUE),]
+down_enrich_pval = down_enrich_kegg[order(as.numeric(down_enrich_kegg$P.value), decreasing=FALSE),]
+down_enrich_cs
+down_enrich_pval
+```
+
+```{r}
+saveRDS(down_enrich, "./nosva_v4/RDS/down_enrichR_d0_lfc1.RDS")
+saveRDS(up_enrich, "./nosva_v4/RDS/up_enrichR_d0_lfc1.RDS")
+```
+
+
+```{r}
+# all genes in enriched KEGG terms
+up_kegg_genes = unique(unlist(lapply(up_enrich_pval$Genes, function(x) strsplit(x, split=";"))))
+down_kegg_genes = unique(unlist(lapply(down_enrich_pval$Genes, function(x) strsplit(x, split=";"))))
+
+# create empty contingency table
+up_kegg_gene_matrix = matrix(ncol=length(up_kegg_genes), nrow=length(up_enrich_cs$Term))
+down_kegg_gene_matrix = matrix(ncol=length(down_kegg_genes), nrow=length(down_enrich_cs$Term))
+
+# fill contingency tables and melt
+for(gene in 1:length(up_kegg_genes)){
+  up_kegg_gene_matrix[grep(up_kegg_genes[gene], up_enrich_cs$Genes, fixed=TRUE), gene] = 1
+}
+rownames(up_kegg_gene_matrix) = up_enrich_cs$Term
+colnames(up_kegg_gene_matrix) = up_kegg_genes
+up_kegg_gene_matrix = melt(up_kegg_gene_matrix)
+head(up_kegg_gene_matrix)
+
+for(gene in 1:length(down_kegg_genes)){
+  down_kegg_gene_matrix[grep(down_kegg_genes[gene], down_enrich_cs$Genes, fixed=TRUE), gene] = 1
+}
+rownames(down_kegg_gene_matrix) = down_enrich_cs$Term
+colnames(down_kegg_gene_matrix) = down_kegg_genes
+down_kegg_gene_matrix = melt(down_kegg_gene_matrix)
+head(down_kegg_gene_matrix)
+```
+
+```{r}
+ggplot(up_kegg_gene_matrix, aes(x = Var2, y = Var1)) + 
+  geom_raster(aes(fill=value)) + 
+  scale_fill_gradient(low="grey90", high="red") +
+  labs(x="letters", y="LETTERS", title="Matrix") +
+  theme_bw() + theme(axis.text.x=element_text(size=9, angle=90, vjust=0.3),
+                     axis.text.y=element_text(size=9),
+                     plot.title=element_text(size=11))
+```
+
+```{r}
+up_kegg_gene_pval = up_tab[match(capitalize(tolower(up_kegg_genes)), up_tab$Symbol),"padj"] # get pvalues for genes in kegg table
+names(up_kegg_gene_pval) = up_tab$Symbol[match(capitalize(tolower(up_kegg_genes)), up_tab$Symbol)] # assign gene symbols as names
+up_kegg_gene_l2fc = up_tab[match(capitalize(tolower(up_kegg_genes)), up_tab$Symbol),"log2FoldChange"] # repeat for log2foldchanges
+names(up_kegg_gene_l2fc) = up_tab$Symbol[match(capitalize(tolower(up_kegg_genes)), up_tab$Symbol)]
+up_kegg_gene_matrix$pval = up_kegg_gene_pval[capitalize(tolower(up_kegg_gene_matrix$Var2))] # assign pvalues to kegg table
+up_kegg_gene_matrix$l2fc = up_kegg_gene_l2fc[capitalize(tolower(up_kegg_gene_matrix$Var2))]
+up_kegg_gene_matrix$log10padj = -log10(up_kegg_gene_matrix$pval) * up_kegg_gene_matrix$value # only keep values for genes in pathway
+up_kegg_gene_matrix$l2fc = up_kegg_gene_matrix$l2fc * up_kegg_gene_matrix$value
+up_kegg_gene_matrix
+
+down_kegg_gene_pval = down_tab[match(capitalize(tolower(down_kegg_genes)), down_tab$Symbol),"padj"]
+names(down_kegg_gene_pval) = down_tab$Symbol[match(capitalize(tolower(down_kegg_genes)), down_tab$Symbol)]
+down_kegg_gene_l2fc = down_tab[match(capitalize(tolower(down_kegg_genes)), down_tab$Symbol),"log2FoldChange"]
+names(down_kegg_gene_l2fc) = down_tab$Symbol[match(capitalize(tolower(down_kegg_genes)), down_tab$Symbol)]
+down_kegg_gene_matrix$pval = down_kegg_gene_pval[capitalize(tolower(down_kegg_gene_matrix$Var2))]
+down_kegg_gene_matrix$l2fc = down_kegg_gene_l2fc[capitalize(tolower(down_kegg_gene_matrix$Var2))]
+down_kegg_gene_matrix$log10padj = -log10(down_kegg_gene_matrix$pval) * down_kegg_gene_matrix$value # only keep values for genes in pathway
+down_kegg_gene_matrix$l2fc = down_kegg_gene_matrix$l2fc * down_kegg_gene_matrix$value
+down_kegg_gene_matrix
+```
+
+```{r}
+up_kegg_plot = ggplot(up_kegg_gene_matrix, aes(Var2, Var1)) +
+  geom_point(aes(size=l2fc, color=log10padj)) +
+  theme_bw() +
+  labs_pubr() +
+  theme(axis.text.x=element_text(size=9, angle=90, hjust=1),
+        axis.text.y=element_text(size=11),
+        plot.title=element_text(size=11)) +
+  scale_colour_gradient(low="gray50", high="blue") +
+  xlab("") +
+  ylab("") +
+  guides(color = guide_colorbar(order=1),
+         size = guide_legend(order=2))
+up_kegg_plot
+ggsave(up_kegg_plot, filename="./nosva_v4/Figures/up_kegg_dotplot.tiff", units="in", width=8, height=3.5, dpi=320)
+```
+
+```{r}
+down_kegg_plot = ggplot(down_kegg_gene_matrix, aes(Var2, Var1)) +
+  geom_point(aes(size=-l2fc, color=log10padj)) +
+  theme_bw() +
+  labs_pubr() +
+  theme(axis.text.x=element_text(size=9, angle=90, hjust=1),
+        axis.text.y=element_text(size=11),
+        plot.title=element_text(size=11)) +
+  scale_colour_gradient(low="gray50", high="red") +
+  xlab("") +
+  ylab("") +
+  guides(color = guide_colorbar(order=1),
+         size = guide_legend(order=2))
+ggsave(down_kegg_plot, filename="./nosva_v4/Figures/down_kegg_dotplot.tiff", units="in", width=8.5, height=3.75, dpi=320)
+```
+
+```{r}
+#$color=ifelse(l2fc>0, "red", "blue")
+total_kegg_gene_matrix = rbind(up_kegg_gene_matrix, down_kegg_gene_matrix)
+total_kegg_plot = ggplot(total_kegg_gene_matrix, aes(Var2, Var1)) +
+  geom_point(aes(color=ifelse(l2fc>0, "red", "blue"), group=l2fc, size=log10padj, alpha=0.8)) +
+  theme_bw() +
+  labs_pubr() +
+  theme(axis.text.x=element_text(size=9, angle=90, hjust=1),
+        axis.text.y=element_text(size=11),
+        plot.title=element_text(size=11)) +
+  xlab("") +
+  ylab("") +
+  guides(color = guide_colorbar(order=1),
+         size = guide_legend(order=2))
+total_kegg_plot
+ggsave(total_kegg_plot, filename="./nosva_v4/Figures/total_kegg_plot.tiff", units="in", width=12, height=6, dpi=320)
+```
+
+```{r}
+sum_kegg_tab = rbind(up_enrich_pval, down_enrich_pval)
+sum_kegg_tab$reg = factor(c(rep("Up",nrow(up_enrich_pval)), rep("Down",nrow(down_enrich_pval))), levels = c("Down","Up"))
+sum_kegg_tab$count = unlist(lapply(unlist(sum_kegg_tab$Genes), function(x) length(unlist(strsplit(unlist(x),";")))))
+sum_kegg_tab
+
+sum_kegg_dot = ggdotchart(sum_kegg_tab, x = "Term", y="log10pval", 
+                          size="count", group="reg", color="reg", 
+                          rotate=TRUE, sorting="descending",
+                          palette="lancet", y.text.col = TRUE)
+
+sum_kegg_dot = ggpar(sum_kegg_dot, 
+      ylab = "-log10(padj)", xlab = "KEGG Term",
+      font.y = c(12, "bold"), font.x = c(12, "bold"),
+      font.ytickslab = c(11, "bold"),
+      font.xtickslab = c(11, "bold"),
+      legend = "right",
+      legend.title = c("Regulation"), font.legend = c(12, "bold"))
+
+sum_kegg_dot
+ggsave(sum_kegg_dot, filename="./nosva_v4/Figures/d0_lfc1_dot_kegg_enrichR.tiff", units="in", width=8, height=5, dpi=320)
+```
+
+# GO Term Clustering
+```{r}
+down_enrich_gobp = subset(down_enrich[["GO_Biological_Process_2018"]], subset=P.value<=0.05)
+up_enrich_gobp = subset(up_enrich[["GO_Biological_Process_2018"]], subset=P.value<=0.05)
+up_enrich_gobp
+down_enrich_gobp
+```
+
+# Arrange GO terms for REVIGO clustering
+```{r}
+up_gobp_term = data.frame()
+up_gobp_pval = data.frame()
+
+up_gobp_df = data.frame(Term = unlist(lapply(up_enrich_gobp$Term, function(x) {substr(tail(strsplit(x, " ")[[1]],1),2,11)})),
+                        P.value = up_enrich_gobp$P.value)
+
+up_gobp_df
+```
+
+```{r}
+down_gobp_term = data.frame()
+down_gobp_pval = data.frame()
+
+down_gobp_df = data.frame(Term = unlist(lapply(down_enrich_gobp$Term, function(x) {substr(tail(strsplit(x, " ")[[1]],1),2,11)})),
+                        P.value = down_enrich_gobp$P.value)
+
+down_gobp_df
+```
+
+```{r}
+write.table(up_gobp_df, "./nosva_v4/d0_lfc1_up_gobp.csv",sep=",",quote=FALSE,col.names = TRUE,row.names=FALSE)
+write.table(down_gobp_df, "./nosva_v4/d0_lfc1_down_gobp.csv",sep=",",quote=FALSE,col.names = TRUE,row.names=FALSE)
+```
+
+# Plot REVIGO clusters
+```{r}
+up_rev = read.table("./nosva_v4/d0 lfc1 REVIGO/d0_up_lfc1_gobp_REVIGO_small.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+down_rev = read.table("./nosva_v4/d0 lfc1 REVIGO/d0_down_lfc1_gobp_REVIGO_small.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+```
+
+```{r}
+# isolate coarse GO terms
+up_rev_data <- up_rev [(up_rev$plot_X != "null" & up_rev$plot_Y != "null"), ];
+down_rev_data <- down_rev [(down_rev$plot_X != "null" & down_rev$plot_Y != "null"), ];
+```
+
+```{r}
+# collect coarse GO terms into a single data frame
+d0_rev_data = rbind(up_rev_data, down_rev_data)
+
+d0_rev_data$lfc = factor(c(rep("Up", nrow(up_rev_data)), rep("Down", nrow(down_rev_data))))
+
+d0_rev_data
+```
+
+```{r}
+# assign column types
+d0_rev_data$plot_X <- as.numeric( as.character(d0_rev_data$plot_X) );
+d0_rev_data$plot_Y <- as.numeric( as.character(d0_rev_data$plot_Y) );
+d0_rev_data$plot_size <- as.numeric( as.character(d0_rev_data$plot_size) );
+d0_rev_data$log10.p.value <- -as.numeric( as.character(d0_rev_data$log10.p.value) );
+d0_rev_data$frequency <- as.numeric( lapply(d0_rev_data$frequency, function(x) { substr(as.character(x), 1, 5) })); # remove percentage sign
+d0_rev_data$uniqueness <- as.numeric( as.character(d0_rev_data$uniqueness) );
+d0_rev_data$dispensability <- as.numeric( as.character(d0_rev_data$dispensability) );
+d0_rev_data
+```
+
+```{r}
+require("ggrepel")
+library("wesanderson")
+
+pal <- wes_palette("Zissou1", 100, type = "continuous")
+
+p = ggplot(data=subset(d0_rev_data,subset=lfc=="Up"))
+p = p + geom_point(aes( plot_X, plot_Y, colour = log10.p.value, size = plot_size), alpha = 0.6 ) + scale_size_area()
+p = p + scale_colour_gradientn(colours = pal, limits=(c(1, max(subset(d0_rev_data,subset=lfc=="Up")$log10.p.value))))
+p = p + geom_point( aes(plot_X, plot_Y, size = plot_size), shape = 21, fill = "transparent", colour = I (alpha ("black", 0.6) )) +
+  scale_size_area()
+p = p + scale_size(range=c(1,30)) + theme_bw()
+ex <- data.frame(subset(d0_rev_data, subset=lfc=="Up"&dispensability<0.075))
+p = p + geom_label_repel( data = ex, aes(plot_X, plot_Y, label = description, fontface="bold"),
+                          colour = "black", size=5, nudge_y=-0.75, force=3, segment.size = 1)
+p = p + labs (y = "semantic space x", x = "semantic space y");
+p = p + theme(legend.key = element_blank(), legend.position = "right", legend.key.size = unit(1,"cm"), 
+              legend.key.width = unit(0.75,"cm"), axis.text.x=element_text(size=12), axis.text.y=element_text(size=12),
+              legend.justification = "top", axis.title.x=element_blank(), axis.title.y=element_blank())
+p = p + guides(size=FALSE)
+p
+
+ggsave(p, filename="./nosva_v4/Figures/d0_lfc1_up_gopb_REVIGO.tiff", units="in", width=10, height=10, dpi=320)
+```
+
+```{r}
+p = ggplot(data=subset(d0_rev_data,subset=lfc=="Down"))
+p = p + geom_point(aes( plot_X, plot_Y, colour = log10.p.value, size = plot_size), alpha = 0.6 ) + scale_size_area()
+p = p + scale_colour_gradientn(colours = pal, limits=(c(1, max(subset(d0_rev_data,subset=lfc=="Down")$log10.p.value))))
+p = p + geom_point( aes(plot_X, plot_Y, size = plot_size), shape = 21, fill = "transparent", colour = I (alpha ("black", 0.6) )) +
+  scale_size_area()
+p = p + scale_size(range=c(1,30)) + theme_bw()
+ex <- data.frame(subset(d0_rev_data, subset=lfc=="Down"&dispensability<0.075))
+p = p + geom_label_repel( data = ex, aes(plot_X, plot_Y, label = description, fontface="bold"),
+                          colour = "black", size=5, nudge_y=-0.75, force=3, segment.size = 1)
+p = p + labs (y = "semantic space x", x = "semantic space y");
+p = p + theme(legend.key = element_blank(), legend.position = "right", legend.key.size = unit(1,"cm"), 
+              legend.key.width = unit(0.75,"cm"), axis.text.x=element_text(size=12), axis.text.y=element_text(size=12),
+              legend.justification = "top", axis.title.x=element_blank(), axis.title.y=element_blank())
+p = p + guides(size=FALSE)
+p
+
+ggsave(p, filename="./nosva_v4/Figures/d0_lfc1_down_gopb_REVIGO.tiff", units="in", width=10, height=10, dpi=320)
+```
+
