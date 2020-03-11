@@ -1,0 +1,129 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r message=TRUE, include=FALSE}
+library("DESeq2")
+library("tximport")
+library("rhdf5")
+library("EnsDb.Mmusculus.v79")
+library("AnnotationHub")
+library("BiocParallel")
+library("ggplot2")
+library("pheatmap")
+library("dplyr")
+library("ggpubr")
+library("reshape2")
+#register(MulticoreParam(32))
+```
+
+```{r}
+setwd("C:/Users/NOBEL/Box/Lab Notes/Lab Notes Benjamin/Sestrins/Mouse RNA-Seq")
+```
+
+```{r}
+edb = EnsDb.Mmusculus.v79
+k <- keys(edb, keytype = "TXNAME")
+tx2gene = genes(edb, filter = TxIdFilter(k), columns = c("tx_id","gene_id"), return.type="data.frame")
+```
+
+```{r}
+resLFC_d0 = readRDS("./nosva_v4/RDS/resLFC_d0.RDS")
+resLFC_d7 = readRDS("./nosva_v4/RDS/resLFC_d7.RDS")
+resLFC_d21 = readRDS("./nosva_v4/RDS/resLFC_d21.RDS")
+rld = readRDS("./nosva_v4/RDS/rld.RDS")
+```
+
+# Import gene lists from excel sheet
+```{r}
+library(readxl)
+total_geneList = as.list(read_xlsx(path = "./TargetedGeneLists.xlsx", col_names=TRUE, col_types = "text"))
+names(total_geneList) = c("Qui", "CC", "Infl", "Neur", "Adh", "Myo", "Chr", "Wnt", "ROS")
+total_geneList = lapply(total_geneList, function(x) x[!is.na(x)])
+total_geneList_stack = as.data.frame(stack(total_geneList))
+total_geneList_ens = genes(edb, columns="gene_id", filter=SymbolFilter(unlist(total_geneList)), return.type="data.frame")$gene_id
+```
+
+```{r}
+padj_thresh = 0.01
+lfc_thresh = 1
+```
+
+# Compare gene lists across time points
+```{r}
+d0_geneList = subset(as.data.frame(resLFC_d0[total_geneList_ens,]), select = c("Symbol", "log2FoldChange", "padj", "lfcSE"))
+d0_geneList$Cluster = total_geneList_stack$ind[match(d0_geneList$Symbol, total_geneList_stack$values)]
+d0_geneList$day = rep(factor("d0"), nrow(d0_geneList))
+d0_geneList$log10padj = -log10(d0_geneList$padj)
+d0_geneList = subset(d0_geneList, subset=(padj<=padj_thresh & abs(log2FoldChange)>=lfc_thresh))
+
+d7_geneList = subset(as.data.frame(resLFC_d7[total_geneList_ens,]), select = c("Symbol", "log2FoldChange", "padj", "lfcSE"))
+d7_geneList$Cluster = total_geneList_stack$ind[match(d7_geneList$Symbol, total_geneList_stack$values)]
+d7_geneList$day = rep(factor("d7"), nrow(d7_geneList))
+d7_geneList$log10padj = -log10(d7_geneList$padj)
+d7_geneList = subset(d7_geneList, subset=(padj<=padj_thresh & abs(log2FoldChange)>=lfc_thresh))
+
+d21_geneList = subset(as.data.frame(resLFC_d21[total_geneList_ens,]), select = c("Symbol", "log2FoldChange", "padj", "lfcSE"))
+d21_geneList$Cluster = total_geneList_stack$ind[match(d21_geneList$Symbol, total_geneList_stack$values)]
+d21_geneList$day = rep(factor("d21"), nrow(d21_geneList))
+d21_geneList$log10padj = -log10(d21_geneList$padj)
+d21_geneList = subset(d21_geneList, subset=(padj<=padj_thresh & abs(log2FoldChange)>=lfc_thresh))
+
+total_df = rbind(d0_geneList, d7_geneList, d21_geneList)
+total_df = subset(total_df, subset = padj<0.05)
+```
+
+```{r}
+# combine genes differentially expressed in at least one time point.
+total_df_int = unique(c(rownames(d0_geneList), 
+                        rownames(d7_geneList), 
+                        rownames(d21_geneList)))
+length(total_df_int)
+```
+
+```{r}
+# average across replicates
+data = as.data.frame(assay(rld))[total_df_int,]
+d0.WT.means = rowMeans(data[,1:2])
+d0.KO.means = rowMeans(data[,3:4])
+d7.WT.means = rowMeans(data[,5:6])
+d7.KO.means = rowMeans(data[,7:8])
+d21.WT.means = data[,9]
+d21.KO.means = rowMeans(data[,10:11])
+data_avg = data.frame(list(d0WT=d0.WT.means, d0KO=d0.KO.means, d7WT=d7.WT.means, d7KO=d7.KO.means, d21WT=d21.WT.means, d21KO=d21.KO.means))
+data_avg
+```
+
+```{r}
+# calculate fold changes
+d0.fc = data_avg$d0KO / data_avg$d0WT
+d7.fc = data_avg$d7KO / data_avg$d7WT
+d21.fc = data_avg$d21KO / data_avg$d21WT
+data_fc = data.frame(list(d0=d0.fc, d7=d7.fc, d21=d21.fc))
+rownames(data_fc) = rownames(data_avg)
+data_fc
+```
+
+```{r}
+# calculate z-scores
+data_zscore = t(data_fc) # scale works on columns, not rows
+data_zscore = scale(data_zscore, center=TRUE, scale=TRUE)
+data_zscore = as.data.frame(t(data_zscore)) # return data to original dimensions
+data_zscore
+```
+
+```{r}
+# plot z-scores
+data_zscore$symbol = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(data_zscore)), return.type="data.frame")$symbol
+data_zscore$cluster = total_geneList_stack$ind[match(data_zscore$symbol,total_geneList_stack$values)]
+data_zscore_melt = melt(data_zscore)
+data_zscore_melt
+ggline(data_zscore_melt, x="variable", y="value", facet.by = "cluster",
+          add=c("mean","boxplot","jitter"),
+          color = "cluster",
+          linetype="solid", palette="npg",
+          point.size = 0.5, point.color = "black") +
+  geom_hline(yintercept = 0)
+```
+

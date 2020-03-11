@@ -47,6 +47,12 @@ down_enrich_pval
 ```
 
 ```{r}
+saveRDS(down_enrich, "./nosva_v4/RDS/down_enrichR_d0_lfc1.RDS")
+saveRDS(up_enrich, "./nosva_v4/RDS/up_enrichR_d0_lfc1.RDS")
+```
+
+
+```{r}
 # all genes in enriched KEGG terms
 up_kegg_genes = unique(unlist(lapply(up_enrich_pval$Genes, function(x) strsplit(x, split=";"))))
 down_kegg_genes = unique(unlist(lapply(down_enrich_pval$Genes, function(x) strsplit(x, split=";"))))
