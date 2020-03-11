@@ -1,0 +1,2 @@
+geneSet	description	link	size	overlap	expect	enrichmentRatio	pValue	FDR	overlapId	userId
+GO:0007389	pattern specification process	http://amigo.geneontology.org/amigo/term/GO:0007389	442	8	1.1757854626500825	6.803962333374099	1.6748792959098147e-5	0.013600019882787695	13172;16869;22408;68922;73293;76441;235320;320878	Lhx1;Ccdc103;Wnt1;Dbx1;Mical2;Daam2;Dnaic1;Zbtb16

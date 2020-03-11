@@ -29,18 +29,33 @@ tx2gene = genes(edb, filter = TxIdFilter(k), columns = c("tx_id","gene_id"), ret
 
 ```{r}
 setwd("C:/Users/NOBEL/Box/Lab Notes/Lab Notes Benjamin/Sestrins/Mouse RNA-Seq")
-condition = factor(rep(c("WT", "KO"), each=2, times=3), levels = c("WT","KO"))
-day = factor(rep(c("d-0","d-7","d-21"), each=4), levels = c("d-0","d-7","d-21"))
-replicate = factor(rep(c("R1","R2"), times=6))
-
-sample_id = paste(day, condition, replicate, sep="-")
-sample_path = file.path(".", "mm38", paste("MuSC", sample_id, sep="-"))
-sampleTable = data.frame(sample=as.character(sample_id), condition=condition, day=day, replicate=replicate)
-sampleTable <- dplyr::mutate(sampleTable, path = sample_path)
-# s2c$day = as.factor(s2c$day)'
-sampleTable$group = factor(paste(sampleTable$day,sampleTable$condition,sep = '-'))
+# condition = factor(rep(c("WT", "KO"), each=2, times=3), levels = c("WT","KO"))
+# day = factor(rep(c("d-0","d-7","d-21"), each=4), levels = c("d-0","d-7","d-21"))
+# replicate = factor(rep(c("R1","R2"), times=6))
+# 
+# sample_id = paste(day, condition, replicate, sep="-")
+# sample_path = file.path(".", "mm38", paste("MuSC", sample_id, sep="-"))
+# sampleTable = data.frame(sample=as.character(sample_id), condition=condition, day=day, replicate=replicate)
+# sampleTable <- dplyr::mutate(sampleTable, path = sample_path)
+# # s2c$day = as.factor(s2c$day)'
+# sampleTable$group = factor(paste(sampleTable$day,sampleTable$condition,sep = '-'))
+# sampleTable$group = relevel(sampleTable$group, ref="d-0-WT")
+# sampleTable = sampleTable[-9,]
+# sampleTable
+sampleTable = data.frame(sample=list.files("./mm38"), stringsAsFactors=F)
+condition = unlist(lapply(unlist(sampleTable$sample), function(x){unlist(strsplit(x,split="-"))[4]}))
+day = unlist(lapply(unlist(sampleTable$sample), function(x){paste(unlist(strsplit(x,split="-"))[2:3], collapse="-")}))
+replicate = unlist(lapply(unlist(sampleTable$sample), function(x){unlist(strsplit(x,split="-"))[5]}))
+sampleTable = cbind(sampleTable, 
+                    condition=factor(condition, levels=c("WT","KO")), 
+                    day=factor(day, levels=c("d-0","d-7","d-21")), 
+                    replicate=factor(replicate))
+sampleTable = mutate(sampleTable, group = factor(paste(day,condition,sep="-")))
 sampleTable$group = relevel(sampleTable$group, ref="d-0-WT")
-sampleTable = sampleTable[-9,]
+sampleTable = mutate(sampleTable, path = file.path(".","mm38",paste("MuSC",day,condition,replicate,sep="-")))
+sampleTable=sampleTable[order(sampleTable$day),]
+sampleTable$batch = factor(c(rep("old",12), rep("new",3)))
+sampleTable = sampleTable[-c(11,12,13),] # remove MuSC-d-21-WT-R1
 sampleTable
 ```
 
@@ -69,7 +84,9 @@ saveRDS(dds, "./nosva_v4/RDS/raw_dds.RDS")
 dds_cor = cor(counts(dds),  method="spearman")
 rownames(dds_cor) <- paste(dds$sample, sep="-")
 colnames(dds_cor) <- NULL
-pheatmap(dds_cor, main="Spearman Correlation")
+tiff(filename="./nosva_v4/Figures/dds_spearman.tiff", units="in", width=7, height=5, res=320)
+pheatmap(dds_cor, cluster_rows = F, cluster_cols = F, display_numbers = T, main="Spearman Correlation")
+dev.off()
 ```
 
 # Visualization.
@@ -111,23 +128,35 @@ pheatmap(sampleDistMatrix,
 ```
 
 ```{r}
-pcaData <- plotPCA(rld, intgroup = c( "condition", "day"), returnData = TRUE)
-percentVar <- round(100 * attr(pcaData, "percentVar"))
+# implement custom version of DESeq2 plotPCA
 
-# dds_pca = ggplot(pcaData, aes(x = PC1, y = PC2, color = condition, shape = day)) +
-#       geom_point(size=5) +
-#       xlab(paste0("PC1: ", percentVar[1], "% variance")) +
-#       ylab(paste0("PC2: ", percentVar[2], "% variance")) +
-#   theme_pubr()
-dds_pca = ggscatter(pcaData, x="PC1", y="PC2", 
+rv = rowVars(assay(rld))
+select = order(rv, decreasing=T)[seq_len(min(500, length(rv)))]
+rld_PCA = prcomp(t(assay(rld)[select,]), center=T, scale=F) # clustering variables not genes, don't scale as rlog already scaled
+summary(rld_PCA)
+percent_var = (rld_PCA$sdev^2 / sum(rld_PCA$sdev^2)) * 100
+rld_PCA_df = data.frame(rld_PCA$x, sampleTable)
+dds_pca = ggscatter(rld_PCA_df, x="PC1", y="PC2", 
                     color="condition", shape="day",
                     palette = "lancet",
                     size=5,
-                    legend="right") + 
+                    legend = "right") + 
+  labs(x = paste0("PC1: ", round(percent_var[1],1), "% variance"), y = paste0("PC2: ", round(percent_var[2],1), "% variance")) +
+  theme(axis.title.x = element_text(size=18), axis.title.y = element_text(size=18)) +
   labs_pubr()
 dds_pca
 
-ggsave(dds_pca, filename="./nosva_v4/Figures/rlog_pca.tiff", 
+# pcaData <- plotPCA(rld, intgroup = c( "condition", "day"), returnData = TRUE)
+# percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+# dds_pca = ggplot(pcaData, aes(x = PC1, y = PC2, color = condition, shape = day)) +
+#        geom_point(size=5) +
+#        xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+#        ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+#    theme_pubr()
+# dds_pca
+
+ggsave(dds_pca, filename="./nosva_v4/Figures/rlog_pca_newreps.tiff", 
        width=5, height=4, units="in", dpi=320)
 ```
 
@@ -197,6 +226,9 @@ write.csv(resLFC_d0_Down_Sig0.05, file="./nosva_v4/d0_sig0.05_down_l2fc1.csv")
 write.csv(resLFC_d0_Up_Sig0.05, file="./nosva_v4/d0_sig0.05_up_l2fc1.csv")
 write.csv(resLFC_d0_Down_Sig0.01, file="./nosva_v4/d0_sig0.01_down_l2fc1.csv")
 write.csv(resLFC_d0_Up_Sig0.01, file="./nosva_v4/d0_sig0.01_up_l2fc1.csv")
+
+# write.csv(resLFC_d0_Down_Sig0.01, file="./test_d0_sig0.01_down_l2fc1.csv")
+# write.csv(resLFC_d0_Up_Sig0.01, file="./test_d0_sig0.01_up_l2fc1.csv")
 ```
 
 # Day 7 different significance levels
@@ -222,6 +254,9 @@ write.csv(resLFC_d7_Down_Sig0.05, file="./nosva_v4/d7_sig0.05_down_l2fc1.csv")
 write.csv(resLFC_d7_Up_Sig0.05, file="./nosva_v4/d7_sig0.05_up_l2fc1.csv")
 write.csv(resLFC_d7_Down_Sig0.01, file="./nosva_v4/d7_sig0.01_down_l2fc1.csv")
 write.csv(resLFC_d7_Up_Sig0.01, file="./nosva_v4/d7_sig0.01_up_l2fc1.csv")
+
+# write.csv(resLFC_d7_Down_Sig0.01, file="./test_d7_sig0.01_down_l2fc1.csv")
+# write.csv(resLFC_d7_Up_Sig0.01, file="./test_d7_sig0.01_up_l2fc1.csv")
 ```
 
 # Day 21 different significance levels
@@ -247,12 +282,30 @@ write.csv(resLFC_d21_Down_Sig0.05, file="./nosva_v4/d21_sig0.05_down_l2fc1.csv")
 write.csv(resLFC_d21_Up_Sig0.05, file="./nosva_v4/d21_sig0.05_up_l2fc1.csv")
 write.csv(resLFC_d21_Down_Sig0.01, file="./nosva_v4/d21_sig0.01_down_l2fc1.csv")
 write.csv(resLFC_d21_Up_Sig0.01, file="./nosva_v4/d21_sig0.01_up_l2fc1.csv")
+
+# write.csv(resLFC_d21_Down_Sig0.01, file="./test_d21_sig0.01_down_l2fc1.csv")
+# write.csv(resLFC_d21_Up_Sig0.01, file="./test_d21_sig0.01_up_l2fc1.csv")
+```
+
+```{r}
+WebGestaltR(enrichMethod = "ORA",
+            organism = "mmusculus",
+            enrichDatabase = c("geneontology_Biological_Process_noRedundant", "pathway_KEGG"),
+            interestGene = readClipboard(),
+            interestGeneType = "genesymbol",
+            collapseMethod = "mean",
+            referenceSet = "genome",
+            minNum = 10, maxNum = 500,
+            sigMethod = "fdr", fdrMethod = "BH", fdrThr = 0.05,
+            reportNum = 30,
+            isOutput = F)
 ```
 
 ```{r dpi=200}
 library("genefilter")
 library("pheatmap")
 library("RColorBrewer")
+library(ComplexHeatmap)
 
 #topVarGenes <- head(order(rowVars(assay(rld)), decreasing = TRUE), 50)
 topVarGenes <- unlist(lapply(unique(unlist(d0_d7_d21_int)), FUN = function(x) {match(x,rownames(assay(rld)))}))
@@ -261,9 +314,22 @@ mat  <- assay(rld)[ topVarGenes, ]
 #mat  <- mat - rowMeans(mat)
 topVarGeneSymbols = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(mat)), return.type="data.frame")$symbol
 rownames(mat) = topVarGeneSymbols
-anno <- as.data.frame(colData(rld)[, c("condition","day")])
-#rownames(anno) = colnames(mat)
-# col.pal <- RColorBrewer::brewer.pal(5, "Reds")
+anno_col <- as.data.frame(colData(rld)[, c("condition","day")])
+anno_col
+
+pheatmap(mat, annotation_col = anno_col, cluster_cols = F, scale = "row")
+
+dpgp_clust = read.table("./nosva_v4/DPGP/DESeq2/dpgp_clusters.tsv", sep="\t", as.is = T, header=T, row.names = NULL)
+anno_row <- data.frame(cluster=factor(
+  dpgp_clust$cluster[
+    unlist(lapply(rownames(mat), function(x) {match(x,dpgp_clust$symbol)}))
+    ]), stringsAsFactors = FALSE)
+anno_row = cbind(mat[,0],anno_row)
+anno_row
+# 
+# row_ha = rowAnnotation(cluster = anno_block(gp = gpar(fill = brewer.pal(11,"Paired")[order()])))
+# Heatmap(t(scale(t(mat))), cluster_rows = T, cluster_columns = F, right_annotation = row_ha,
+#         row_km=11)
 
 # hmp = pheatmap(mat, annotation_col = anno, scale="row", 
 #                color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(200),
@@ -272,41 +338,63 @@ anno <- as.data.frame(colData(rld)[, c("condition","day")])
 #                cluster_rows = TRUE, cluster_cols = FALSE, treeheight_row = 0,
 #                annotation_legend = FALSE, legend = TRUE) 
 
-hmp = pheatmap(mat, annotation_col = anno, scale="row", 
+hmp_dpgp = pheatmap(mat, annotation_col = anno_col, annotation_row = anno_row, cluster_rows = F, scale="row",
+         color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(200),
+         show_rownames = F, cellwidth = 30, cellheight = 0.4, cluster_cols = F, show_colnames = F)
+ggsave(hmp_dpgp, filename="./nosva_v4/Figures/DE_rld_KOvsWT_DPGPclust_pheatmap.tiff", units="in", width=7, height=6.5, dpi=200, limitsize=FALSE)
+
+hmp = pheatmap(mat, annotation_col = anno_col, annotation_row = anno_row, scale="row", 
                color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(200),
                show_colnames = FALSE, show_rownames = FALSE, fontsize_row = 8,
-               cellwidth = 40, cellheight=0.4, border_color = NA,
+               cellwidth = 30, cellheight=0.4, border_color = NA,
                cluster_rows = TRUE, cluster_cols = FALSE, treeheight_row = 0,
-               annotation_legend = FALSE, legend = TRUE) 
+               annotation_legend = TRUE, legend = TRUE) 
+hmp
 
-ggsave(hmp, filename="./nosva_v4/Figures/DE_rld_KOvsWT_pheatmap.tiff", units="in", width=7, height=6.5, dpi=200, limitsize = FALSE)
+#ggsave(hmp, filename="./nosva_v4/Figures/DE_rld_KOvsWT_pheatmap.tiff", units="in", width=7, height=6.5, dpi=200, limitsize = FALSE)
 ```
 
-```{r fig.height=8}
+```{r}
+head(rownames(mat[hmp$tree_row[["order"]],]))
+hmp_clust = sort(cutree(hmp$tree_row, k=11))
+hmp_clust = as.data.frame(hmp_clust, row.names=names(hmp_clust))
+hmp_clust$dpgp_clust = hmp_clust[rownames(anno_row),]
+hmp_clust
+```
+
+```{r}
 library("EnhancedVolcano")
 # The default cut-off for log2FC is >|2|; the default cut-off for P value is 10e-6.
+tiff(filename="./nosva_v4/Figures/d0_volcano.tiff", units="in", width=7, height=5, res=180)
 EnhancedVolcano(resLFC_d0,
-  lab = resLFC_d0$Symbol,
-  title = "Day 0 (KO vs WT) - 0.01 FDR",
-  ylab = bquote(~-Log[10]~adjusted~italic(P)),
-  pCutoff = 0.01,
-  FCcutoff = 1,
-  x = 'log2FoldChange',
-  y = 'padj')
-EnhancedVolcano(resLFC_d7,
-  lab = resLFC_d7$Symbol,
-  title = "Day 7 (KO vs WT) - 0.01 FDR",
-  ylab = bquote(~-Log[10]~adjusted~italic(P)),
-  pCutoff = 0.05,
-  x = 'log2FoldChange',
-  y = 'padj')
-EnhancedVolcano(resLFC_d21,
-  lab = resLFC_d21$Symbol,
-  title = "Day 21 (KO vs WT) - 0.01 FDR",
-  ylab = bquote(~-Log[10]~adjusted~italic(P)),
-  pCutoff = 0.01,
-  x = 'log2FoldChange',
-  y = 'padj')
+                lab = resLFC_d0$Symbol,
+                title = NULL, subtitle = NULL, caption = NULL,
+                ylab = bquote(~-Log[10]~adjusted~italic(P)),
+                labSize = 4.0,
+                pCutoff = 10e-6,
+                FCcutoff = 1,
+                legendPosition ="top",
+                x = 'log2FoldChange',
+                y = 'pvalue',
+                border = "full",
+                borderWidth = 1.0)
+  # ggplot2::coord_cartesian(xlim=c(-10, 10)) +
+  # ggplot2::scale_x_continuous(breaks=seq(-10,10, 2))
+dev.off()
+# EnhancedVolcano(resLFC_d7,
+#   lab = resLFC_d7$Symbol,
+#   title = "Day 7 (KO vs WT) - 0.01 FDR",
+#   ylab = bquote(~-Log[10]~adjusted~italic(P)),
+#   pCutoff = 0.05,
+#   x = 'log2FoldChange',
+#   y = 'padj')
+# EnhancedVolcano(resLFC_d21,
+#   lab = resLFC_d21$Symbol,
+#   title = "Day 21 (KO vs WT) - 0.01 FDR",
+#   ylab = bquote(~-Log[10]~adjusted~italic(P)),
+#   pCutoff = 0.01,
+#   x = 'log2FoldChange',
+#   y = 'padj')
 ```
 
 ```{r}
@@ -328,6 +416,12 @@ d0_d7_d21_venn
 d0_d7_d21_venn_nolabel
 ggexport(d0_d7_d21_venn, filename="./nosva_v4/Figures/d0_d7_d21_DE_venn.tiff", dpi=320)
 ggexport(d0_d7_d21_venn_nolabel, filename="./nosva_v4/Figures/d0_d7_d21_DE_venn_nolabel.tiff", dpi=320)
+```
+
+```{r}
+d0_d7_d21_int_mat = make_comb_mat(d0_d7_d21_int)
+set_size(d0_d7_d21_int_mat)
+UpSet(d0_d7_d21_int_mat)
 ```
 
 ```{r}

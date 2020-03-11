@@ -1,0 +1,9 @@
+userId	geneSymbol	geneName	entrezgene	gLink
+Bcl6	Bcl6	B cell leukemia/lymphoma 6	12053	https://www.ncbi.nlm.nih.gov/gene/?term=12053
+Prpf19	Prpf19	pre-mRNA processing factor 19	28000	https://www.ncbi.nlm.nih.gov/gene/?term=28000
+Dhcr24	Dhcr24	24-dehydrocholesterol reductase	74754	https://www.ncbi.nlm.nih.gov/gene/?term=74754
+Cxcr4	Cxcr4	chemokine (C-X-C motif) receptor 4	12767	https://www.ncbi.nlm.nih.gov/gene/?term=12767
+Igsf11	Igsf11	immunoglobulin superfamily, member 11	207683	https://www.ncbi.nlm.nih.gov/gene/?term=207683
+Ppp2r5e	Ppp2r5e	protein phosphatase 2, regulatory subunit B', epsilon	26932	https://www.ncbi.nlm.nih.gov/gene/?term=26932
+Pde5a	Pde5a	phosphodiesterase 5A, cGMP-specific	242202	https://www.ncbi.nlm.nih.gov/gene/?term=242202
+Gm5641	Gm5641	NA	434807	https://www.ncbi.nlm.nih.gov/gene/?term=434807

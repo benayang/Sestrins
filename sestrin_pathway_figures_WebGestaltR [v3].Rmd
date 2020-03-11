@@ -1,0 +1,327 @@
+---
+title: "Sestrin Pathway Figures"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+projdir = file.path("./sva_v2")
+```
+
+```{r include=FALSE}
+library(ggplot2)
+library(ggpubr)
+library(dplyr)
+library(tibble)
+library(enrichR)
+library(Hmisc)
+library(ggsci)
+library(reshape2)
+library(ComplexHeatmap)
+library(WebGestaltR)
+```
+
+```{r}
+setwd("C:/Users/NOBEL/Box/Lab Notes/Lab Notes Benjamin/Sestrins/Mouse RNA-Seq")
+```
+
+```{r}
+up_tab = read.table(file.path(projdir,"d0_sig0.01_up_l2fc1.csv"), sep=",", header = TRUE, stringsAsFactors = FALSE)
+down_tab = read.table(file.path(projdir,"d0_sig0.01_down_l2fc1.csv"), sep=",", header = TRUE, stringsAsFactors = FALSE)
+up_d7_tab = read.table(file.path(projdir,"d7_sig0.01_up_l2fc1.csv"), sep=",", header = TRUE, stringsAsFactors = FALSE)
+down_d7_tab = read.table(file.path(projdir,"d7_sig0.01_down_l2fc1.csv"), sep=",", header = TRUE, stringsAsFactors = FALSE)
+up_d21_tab = read.table(file.path(projdir,"d21_sig0.01_up_l2fc1.csv"), sep=",", header = TRUE, stringsAsFactors = FALSE)
+down_d21_tab = read.table(file.path(projdir,"d21_sig0.01_down_l2fc1.csv"), sep=",", header = TRUE, stringsAsFactors = FALSE)
+head(up_tab)
+```
+
+# Create list of each 0.01 sig file
+```{r}
+sig0.01_files = list.files(path=projdir, pattern="sig0.01")
+file_list = list()
+kegg_list = list()
+go_list = list()
+for(f in 1:length(sig0.01_files)){
+  newname = unlist(strsplit(sig0.01_files[f], split="_")[[1]][c(1,3)]) # get day and l2fc
+  newname = paste0(newname[1],newname[2])
+  file_list[[newname]] = read.table(file.path(projdir,sig0.01_files[f]), sep=",", header=T, as.is=T)
+}
+```
+
+# Get GO and KEGG enrichments for each file
+```{r}
+time_enrich = list()
+
+for(f in names(file_list)){
+  time_enrich[[f]] = WebGestaltR(enrichMethod = "ORA",
+                                 organism = "mmusculus",
+                                 enrichDatabase = c("pathway_KEGG","geneontology_Biological_Process_noRedundant"),
+                                 interestGene = file_list[[f]]$Symbol[1:100],
+                                 interestGeneType = "genesymbol",
+                                 collapseMethod = "mean",
+                                 referenceSet = "genome",
+                                 minNum = 10, maxNum = 500,
+                                 sigMethod = "fdr", fdrMethod = "BH", fdrThr = 0.05,
+                                 reportNum = 50,
+                                 isOutput = T, outputDirectory = file.path(projdir,"time_WebGestaltR"),
+                                 projectName = f)
+}
+
+time_enrich
+```
+
+```{r}
+saveRDS(time_enrich, file.path(projdir,"RDS","time_enrich_WebGestaltR.RDS"))
+time_enrich = readRDS(file.path(projdir,"RDS","time_enrich_WebGestaltR.RDS"))
+```
+
+# replace d0 down set with Weighted Cover Set
+```{r}
+d0down_wsc_terms = read.table(file.path(projdir,"time_WebGestaltR","Project_d0down","enriched_geneset_wsc_topsets_d0down.txt"), skip=1)
+d0down_wsc = data.frame(time_enrich[["d0down"]][time_enrich[["d0down"]]$geneSet %in% as.character(d0down_wsc_terms$V1),])
+d0down_wsc
+```
+
+```{r}
+# all up and down regulated genes in enriched GO:BP and KEGG terms for day 0
+time_enrich_df = rbind(time_enrich[["d0up"]], d0down_wsc)
+#time_enrich_df = rbind(time_enrich[["d0up"]], time_enrich[["d0down"]])
+time_enrich_df$lfc = factor(rep(c("Up","Down"), times=c(nrow(time_enrich[["d0up"]]), nrow(d0down_wsc))))
+#time_enrich_df$lfc = factor(rep(c("Up","Down"), times=c(nrow(time_enrich[["d0up"]]), nrow(time_enrich[["d0down"]]))))
+time_enrich_df
+
+time_genes = unique(unlist(lapply(time_enrich_df$userId, function(x) strsplit(x, split=";")))) # create list of all ensembl gene ids
+time_genes_sym = genes(edb, columns="symbol", filter=GeneIdFilter(time_genes), return.type="data.frame") 
+# create list of converted ids to symbols
+
+time_enrich_df = time_enrich_df %>% group_by(description) %>% mutate(genes=strsplit(userId, split=";")) # add ensembl gene ids as new column
+time_enrich_df
+
+# create empty contingency table
+time_gene_matrix = matrix(ncol=length(time_genes), nrow=length(time_enrich_df$description))
+
+# fill contingency tables and melt
+for(gene in 1:length(time_genes)){
+  time_gene_matrix[grep(time_genes[gene], time_enrich_df$genes, fixed=TRUE), gene] = 1 # add 1 where gene falls in geneset
+}
+rownames(time_gene_matrix) = c("Focal adhesion", "Skin development", "Cell chemotaxis", "Ossification", "Ribosome pathway", "p53 signaling pathway",
+                               "Response to wounding", "Muscle tissue development", "Organelle fission", "Cell-cell signaling by Wnt", 
+                               "Response to molecule of bacterial origin") # Geneset vs genes
+#rownames(time_gene_matrix) = time_enrich_df$description
+colnames(time_gene_matrix) = time_genes
+time_gene_matrix = melt(t(time_gene_matrix))
+time_gene_matrix$lfc = time_enrich_df$lfc[match(time_gene_matrix$Var2, time_enrich_df$description)] # Add whether up or downregulated
+
+# add gene level data (l2fc and padj)
+d0_tab = rbind(up_tab, down_tab)
+time_gene_matrix$l2fc = d0_tab$log2FoldChange[match(as.character(time_gene_matrix$Var1), d0_tab$Symbol, nomatch=F)] * time_gene_matrix$value
+time_gene_matrix$log10padj = -log10(d0_tab$padj[match(as.character(time_gene_matrix$Var1), d0_tab$Symbol, nomatch=F)]) * time_gene_matrix$value
+
+time_gene_matrix
+```
+
+```{r}
+time_gene_raster = ggplot(time_gene_matrix, aes(x = Var1, y = Var2)) + 
+  geom_raster(aes(fill=l2fc)) + 
+  scale_fill_distiller(palette="RdBu") +
+  geom_point(aes(size=log10padj)) +
+  labs(x="", y="") +
+  theme_bw() + labs_pubr() +
+  scale_x_discrete(breaks = time_gene_matrix$Var1, labels=time_gene_matrix$Var1) +
+  theme(axis.text.x=element_text(size=9, angle=90, hjust=1),
+        axis.text.y=element_text(size=9),
+        plot.title=element_text(size=11))
+time_gene_raster
+#ggsave(time_gene_raster, filename="./projdir/Figures/d0_term_raster.tiff", units="in", width=11, height=3, dpi=320)
+```
+
+# color palettes
+```{r}
+library(scales)
+show_col(pal_lancet("lanonc", alpha=0.7)(9))
+```
+
+```{r}
+d0_term_plot = ggplot(time_gene_matrix, aes(x=Var1, y=Var2, size=log10padj, fill=l2fc)) +
+  geom_point(shape=21, stroke=0.5) +
+  scale_size(name="-log10(padj)", range=c(0,10)) + 
+  theme_bw() + labs_pubr() +
+  theme(axis.text.x=element_text(size=8, angle=90, hjust=1, vjust=0.5),
+        axis.text.y=element_text(size=9),
+        legend.spacing.y = unit(0.5, 'mm'),
+        legend.title=element_text(size=9), 
+        legend.text=element_text(size=9)) +
+  scale_fill_distiller(name="Log2 Fold\nChange", palette="RdYlBu") +
+  coord_fixed(ratio = 2) +
+  xlab("") +
+  ylab("") +
+  guides(color = guide_colorbar(order=1),
+         size = guide_legend(order=2))
+d0_term_plot
+ggsave(d0_term_plot, filename="./projdir/Figures/d0_wsc_term_plot.tiff", units="in", width=10, height=3.5, dpi=320)
+```
+
+```{r}
+#$color=ifelse(l2fc>0, "red", "blue")
+total_kegg_gene_matrix = rbind(up_kegg_gene_matrix, down_kegg_gene_matrix)
+total_kegg_plot = ggplot(total_kegg_gene_matrix, aes(Var2, Var1)) +
+  geom_point(aes(color=ifelse(l2fc>0, "red", "blue"), group=l2fc, size=log10padj, alpha=0.8)) +
+  theme_bw() +
+  labs_pubr() +
+  theme(axis.text.x=element_text(size=9, angle=90, hjust=1),
+        axis.text.y=element_text(size=11),
+        plot.title=element_text(size=11)) +
+  xlab("") +
+  ylab("") +
+  guides(color = guide_colorbar(order=1),
+         size = guide_legend(order=2))
+total_kegg_plot
+ggsave(total_kegg_plot, filename="./projdir/Figures/total_kegg_plot.tiff", units="in", width=12, height=6, dpi=320)
+```
+
+```{r}
+sum_kegg_tab = rbind(up_enrich_pval, down_enrich_pval)
+sum_kegg_tab$reg = factor(c(rep("Up",nrow(up_enrich_pval)), rep("Down",nrow(down_enrich_pval))), levels = c("Down","Up"))
+sum_kegg_tab$count = unlist(lapply(unlist(sum_kegg_tab$Genes), function(x) length(unlist(strsplit(unlist(x),";")))))
+sum_kegg_tab
+
+sum_kegg_dot = ggdotchart(sum_kegg_tab, x = "Term", y="log10pval", 
+                          size="count", group="reg", color="reg", 
+                          rotate=TRUE, sorting="descending",
+                          palette="lancet", y.text.col = TRUE)
+
+sum_kegg_dot = ggpar(sum_kegg_dot, 
+      ylab = "-log10(padj)", xlab = "KEGG Term",
+      font.y = c(12, "bold"), font.x = c(12, "bold"),
+      font.ytickslab = c(11, "bold"),
+      font.xtickslab = c(11, "bold"),
+      legend = "right",
+      legend.title = c("Regulation"), font.legend = c(12, "bold"))
+
+sum_kegg_dot
+#ggsave(sum_kegg_dot, filename="./projdir/Figures/d0_lfc1_dot_kegg_enrichR.tiff", units="in", width=8, height=5, dpi=320)
+```
+
+# UpSet plot
+```{r}
+lt = time_enrich_df$genes
+names(lt) = time_enrich_df$description
+lt_cmbmat = make_comb_mat(list_to_matrix(lt), mode="distinct")
+
+tiff(filename="./projdir/Figures/d0_lt_cmbmat.tiff", units="in", width=17, height=5, res=320)
+UpSet(lt_cmbmat)
+dev.off()
+```
+
+# GO Term Clustering
+```{r}
+down_enrich_gobp = subset(down_enrich[["GO_Biological_Process_2018"]], subset=Adjusted.P.value<0.05)
+up_enrich_gobp = subset(up_enrich[["GO_Biological_Process_2018"]], subset=Adjusted.P.value<0.05)
+up_enrich_gobp
+down_enrich_gobp
+```
+
+# Arrange GO terms for REVIGO clustering
+```{r}
+up_gobp_term = data.frame()
+up_gobp_pval = data.frame()
+
+up_gobp_df = data.frame(Term = unlist(lapply(up_enrich_gobp$Term, function(x) {substr(tail(strsplit(x, " ")[[1]],1),2,11)})),
+                        P.value = up_enrich_gobp$Adjusted.P.value)
+
+up_gobp_df
+```
+
+```{r}
+down_gobp_term = data.frame()
+down_gobp_pval = data.frame()
+
+down_gobp_df = data.frame(Term = unlist(lapply(down_enrich_gobp$Term, function(x) {substr(tail(strsplit(x, " ")[[1]],1),2,11)})),
+                        P.value = down_enrich_gobp$Adjusted.P.value)
+
+down_gobp_df
+```
+
+```{r}
+write.table(up_gobp_df, "./projdir/d0_lfc1_up_gobp.csv",sep=",",quote=FALSE,col.names = TRUE,row.names=FALSE)
+write.table(down_gobp_df, "./projdir/d0_lfc1_down_gobp.csv",sep=",",quote=FALSE,col.names = TRUE,row.names=FALSE)
+```
+
+# Plot REVIGO clusters
+```{r}
+up_rev = read.table("./projdir/d0 lfc1 REVIGO/d0_up_lfc1_gobp_REVIGO_small.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+down_rev = read.table("./projdir/d0 lfc1 REVIGO/d0_down_lfc1_gobp_REVIGO_small.csv", sep=",", header=TRUE, stringsAsFactors = FALSE)
+```
+
+```{r}
+# isolate coarse GO terms
+up_rev_data <- up_rev [(up_rev$plot_X != "null" & up_rev$plot_Y != "null"), ];
+down_rev_data <- down_rev [(down_rev$plot_X != "null" & down_rev$plot_Y != "null"), ];
+```
+
+```{r}
+# collect coarse GO terms into a single data frame
+d0_rev_data = rbind(up_rev_data, down_rev_data)
+
+d0_rev_data$lfc = factor(c(rep("Up", nrow(up_rev_data)), rep("Down", nrow(down_rev_data))))
+
+d0_rev_data
+```
+
+```{r}
+# assign column types
+d0_rev_data$plot_X <- as.numeric( as.character(d0_rev_data$plot_X) );
+d0_rev_data$plot_Y <- as.numeric( as.character(d0_rev_data$plot_Y) );
+d0_rev_data$plot_size <- as.numeric( as.character(d0_rev_data$plot_size) );
+d0_rev_data$log10.p.value <- -as.numeric( as.character(d0_rev_data$log10.p.value) );
+d0_rev_data$frequency <- as.numeric( lapply(d0_rev_data$frequency, function(x) { substr(as.character(x), 1, 5) })); # remove percentage sign
+d0_rev_data$uniqueness <- as.numeric( as.character(d0_rev_data$uniqueness) );
+d0_rev_data$dispensability <- as.numeric( as.character(d0_rev_data$dispensability) );
+d0_rev_data
+```
+
+```{r}
+require("ggrepel")
+library("wesanderson")
+
+pal <- wes_palette("Zissou1", 100, type = "continuous")
+
+p = ggplot(data=subset(d0_rev_data,subset=lfc=="Up"))
+p = p + geom_point(aes( plot_X, plot_Y, colour = log10.p.value, size = plot_size), alpha = 0.6 ) + scale_size_area()
+p = p + scale_colour_gradientn(colours = pal, limits=(c(1, max(subset(d0_rev_data,subset=lfc=="Up")$log10.p.value))))
+p = p + geom_point( aes(plot_X, plot_Y, size = plot_size), shape = 21, fill = "transparent", colour = I (alpha ("black", 0.6) )) +
+  scale_size_area()
+p = p + scale_size(range=c(1,30)) + theme_bw()
+ex <- data.frame(subset(d0_rev_data, subset=lfc=="Up"&dispensability<0.075))
+p = p + geom_label_repel( data = ex, aes(plot_X, plot_Y, label = description, fontface="bold"),
+                          colour = "black", size=5, nudge_y=-0.75, force=3, segment.size = 1)
+p = p + labs (y = "semantic space x", x = "semantic space y");
+p = p + theme(legend.key = element_blank(), legend.position = "right", legend.key.size = unit(1,"cm"), 
+              legend.key.width = unit(0.75,"cm"), axis.text.x=element_text(size=12), axis.text.y=element_text(size=12),
+              legend.justification = "top", axis.title.x=element_blank(), axis.title.y=element_blank())
+p = p + guides(size=FALSE)
+p
+
+ggsave(p, filename="./projdir/Figures/d0_lfc1_up_gopb_REVIGO.tiff", units="in", width=10, height=10, dpi=320)
+```
+
+```{r}
+p = ggplot(data=subset(d0_rev_data,subset=lfc=="Down"))
+p = p + geom_point(aes( plot_X, plot_Y, colour = log10.p.value, size = plot_size), alpha = 0.6 ) + scale_size_area()
+p = p + scale_colour_gradientn(colours = pal, limits=(c(1, max(subset(d0_rev_data,subset=lfc=="Down")$log10.p.value))))
+p = p + geom_point( aes(plot_X, plot_Y, size = plot_size), shape = 21, fill = "transparent", colour = I (alpha ("black", 0.6) )) +
+  scale_size_area()
+p = p + scale_size(range=c(1,30)) + theme_bw()
+ex <- data.frame(subset(d0_rev_data, subset=lfc=="Down"&dispensability<0.075))
+p = p + geom_label_repel( data = ex, aes(plot_X, plot_Y, label = description, fontface="bold"),
+                          colour = "black", size=5, nudge_y=-0.75, force=3, segment.size = 1)
+p = p + labs (y = "semantic space x", x = "semantic space y");
+p = p + theme(legend.key = element_blank(), legend.position = "right", legend.key.size = unit(1,"cm"), 
+              legend.key.width = unit(0.75,"cm"), axis.text.x=element_text(size=12), axis.text.y=element_text(size=12),
+              legend.justification = "top", axis.title.x=element_blank(), axis.title.y=element_blank())
+p = p + guides(size=FALSE)
+p
+
+ggsave(p, filename="./projdir/Figures/d0_lfc1_down_gopb_REVIGO.tiff", units="in", width=10, height=10, dpi=320)
+```
+

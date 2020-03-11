@@ -1,0 +1,6 @@
+userId	geneSymbol	geneName	entrezgene	gLink
+Vdac1	Vdac1	voltage-dependent anion channel 1	22333	https://www.ncbi.nlm.nih.gov/gene/?term=22333
+Slc27a1	Slc27a1	solute carrier family 27 (fatty acid transporter), member 1	26457	https://www.ncbi.nlm.nih.gov/gene/?term=26457
+Mef2c	Mef2c	myocyte enhancer factor 2C	17260	https://www.ncbi.nlm.nih.gov/gene/?term=17260
+C1qb	C1qb	complement component 1, q subcomponent, beta polypeptide	12260	https://www.ncbi.nlm.nih.gov/gene/?term=12260
+C1qc	C1qc	complement component 1, q subcomponent, C chain	12262	https://www.ncbi.nlm.nih.gov/gene/?term=12262

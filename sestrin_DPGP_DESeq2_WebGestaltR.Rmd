@@ -1,0 +1,497 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+setwd("C:/Users/benjy/Box/Lab Notes/Lab Notes Benjamin/Sestrins/Mouse RNA-Seq")
+setwd("C:/Users/NOBEL/Box/Lab Notes/Lab Notes Benjamin/Sestrins/Mouse RNA-Seq")
+```
+
+```{r message=FALSE, include=FALSE}
+library("DESeq2")
+library("EnsDb.Mmusculus.v79")
+library("ggplot2")
+library("pheatmap")
+library("dplyr")
+library("ggpubr")
+library("reshape2")
+library("ggthemes")
+library("patchwork")
+library("RColorBrewer")
+library("ggsci")
+library("ggbiplot")
+library("factoextra")
+library("ComplexHeatmap")
+```
+
+```{r}
+resLFC_d0 = readRDS("./nosva_v4/RDS/resLFC_d0.RDS")
+resLFC_d7 = readRDS("./nosva_v4/RDS/resLFC_d7.RDS")
+resLFC_d21 = readRDS("./nosva_v4/RDS/resLFC_d21.RDS")
+rld = readRDS("./nosva_v4/RDS/rld.RDS")
+```
+
+```{r}
+edb = EnsDb.Mmusculus.v79
+k <- keys(edb, keytype = "TXNAME")
+tx2gene = genes(edb, filter = TxIdFilter(k), columns = c("tx_id","gene_id"), return.type="data.frame")
+```
+
+```{r}
+padj_thresh = 0.01
+lfc_thresh = 1
+```
+
+```{r}
+# isolate DE genes by thresholds
+resLFC_d0_sub = rownames(subset(resLFC_d0, subset=(padj<=padj_thresh & abs(log2FoldChange)>=lfc_thresh)))
+resLFC_d7_sub = rownames(subset(resLFC_d7, subset=(padj<=padj_thresh & abs(log2FoldChange)>=lfc_thresh)))
+resLFC_d21_sub = rownames(subset(resLFC_d21, subset=(padj<=padj_thresh & abs(log2FoldChange)>=lfc_thresh)))
+```
+
+```{r}
+# only keep genes that are differentially expressed across consecutive timepoints
+# left_int = intersect(resLFC_d0_sub, resLFC_d7_sub)
+# right_int = intersect(resLFC_d7_sub, resLFC_d21_sub)
+# total_int = unique(c(left_int, right_int))
+# print(c(length(left_int), length(right_int), length(total_int)))
+
+# combine genes differentially expressed in at least one time point.
+total_int = unique(c(resLFC_d0_sub, resLFC_d7_sub, resLFC_d21_sub))
+length(total_int)
+```
+
+```{r}
+# average across replicates
+data = as.data.frame(assay(rld))[total_int,]
+d0.WT.means = rowMeans(data[,1:2])
+d0.KO.means = rowMeans(data[,3:4])
+d7.WT.means = rowMeans(data[,5:6])
+d7.KO.means = rowMeans(data[,7:8])
+d21.WT.means = data[,9]
+d21.KO.means = rowMeans(data[,10:11])
+data_avg = data.frame(list(d0WT=d0.WT.means, d0KO=d0.KO.means, d7WT=d7.WT.means, d7KO=d7.KO.means, d21WT=d21.WT.means, d21KO=d21.KO.means))
+data_avg
+```
+
+```{r}
+# calculate fold changes
+d0.fc = data_avg$d0KO / data_avg$d0WT
+d7.fc = data_avg$d7KO / data_avg$d7WT
+d21.fc = data_avg$d21KO / data_avg$d21WT
+data_fc = data.frame(list(d0=d0.fc, d7=d7.fc, d21=d21.fc))
+rownames(data_fc) = rownames(data_avg)
+data_fc
+```
+
+```{r}
+write.table(data_fc, file="./nosva_v4/DPGP/data_fc_unscaled.txt", sep="\t", quote=FALSE, row.names = TRUE, col.names = TRUE)
+```
+
+```{r}
+# calculate z-scores
+data_zscore = t(data_fc) # scale works on columns, not rows
+data_zscore = scale(data_zscore, center=TRUE, scale=TRUE)
+data_zscore = as.data.frame(t(data_zscore)) # return data to original dimensions
+data_zscore
+```
+
+```{r}
+write.table(data_zscore, file="./nosva_v4/DPGP/data_zscore.txt", sep="\t", quote=FALSE, row.names = TRUE, col.names = TRUE)
+data_zscore = read.table("./nosva_v4/DPGP/data_zscore.txt", sep="\t", header=T)
+```
+
+# After DPGP clustering...
+```{r}
+# import resulting clusters from DPGP
+dpgp_clust = read.table(file="./nosva_v4/DPGP/DESeq2/deseq2__optimal_clustering.txt", sep="\t", header = TRUE)
+dpgp_clust$symbol = as.character(lapply(dpgp_clust$gene, function(x){genes(edb, filter = GeneIdFilter(x), columns = "symbol", return.type="data.frame")$symbol}))
+dpgp_clust
+write.table(dpgp_clust, file="./nosva_v4/DPGP/DESeq2/dpgp_clusters.txt", quote=FALSE, sep="\t", row.names=FALSE, col.names=TRUE)
+```
+
+```{r}
+# Plot time expression of each cluster
+# want to melt by gene symbol
+plot_df = data_zscore
+plot_df$geneid = rownames(plot_df)
+plot_df
+
+plot_df = melt(plot_df, id="geneid")
+plot_df$cluster = dpgp_clust$cluster[match(plot_df$geneid, dpgp_clust$gene)] # assign clusters to data_fc dataframe
+plot_df = plot_df[order(plot_df$cluster),]
+plot_df
+```
+
+```{r}
+# test_pca_df = data_avg
+# test_pca_df$cluster = factor(dpgp_clust$cluster[match(rownames(test_pca_df), dpgp_clust$gene)])
+# test_pca = prcomp(data_avg, scale=T, center=T)
+# summary(test_pca)
+# ggbiplot(test_pca, choices=c(1,2), circle=T, obs.scale=1, var.scale=1,
+#          groups=factor(plot_df$cluster[match(rownames(test_pca$x),rownames(plot_df))])) +
+#   scale_color_brewer(palette="Paired") +
+#   theme_bw()
+
+test_pca = prcomp(data_zscore[,1:3], scale=F, center=F)
+pca_plot = ggbiplot(test_pca, choices=c(1,2), circle=T, obs.scale=1, var.scale=1, ellipse=F,
+                    groups=factor(dpgp_clust$cluster[match(rownames(test_pca$x),dpgp_clust$gene)])) +
+  scale_color_brewer(palette="Paired") +
+  theme_bw() + labs_pubr()
+pca_plot
+ggsave(pca_plot, filename="./nosva_v4/DPGP/DESeq2/DPGP_pcaplot.tiff", units="in", width=5, height=5, dpi=180)
+
+fviz(test_pca, element="ind", geom="point", color = factor(dpgp_clust$cluster[match(rownames(test_pca$x),dpgp_clust$gene)]))
+fviz_pca_biplot(test_pca,
+             geom.ind = "point",
+             point.shape = 19,
+             label = "var",
+             label.size = 5,
+             col.ind = factor(dpgp_clust$cluster[match(rownames(test_pca$x),dpgp_clust$gene)]),
+             col.var = "darkred",
+             arrowsize = 1,
+             repel = TRUE     # Avoid text overlapping,
+             ) +
+  scale_color_brewer(palette="Paired") +
+  theme_bw() +
+  labs_pubr() +
+  coord_fixed()
+
+```
+
+Custom implementation of ggbiplot
+```{r}
+library(ggforce)
+PCA <- prcomp(data_zscore[,1:3], scale=F, center=F)
+#biplot(PCA, scale=0)
+summary(PCA)
+# Extract PC axes
+PCAvalues <- data.frame(Cluster = factor(dpgp_clust$cluster[match(rownames(PCA$x),dpgp_clust$gene)]), PCA$x)
+#PCAvalues = data.frame(PCA$x)
+
+# Extract loadings of the variables (coefficients of linear combination of variables for each PC)
+PCAloadings <- data.frame(Variables = rownames(PCA$rotation), PCA$rotation)
+
+# Calculate the angles and the label offset
+PCAloadings$Angle = ((180/pi) * atan(PCAloadings$PC2/PCAloadings$PC1))
+PCAloadings$OffsetPC1 = sign(PCAloadings$PC1) * 0.1
+PCAloadings$OffsetPC2 = sign(PCAloadings$PC2) * 0.1
+PCAloadings
+
+PCApercentvar = (PCA$sdev^2 / sum(PCA$sdev^2)) * 100
+
+
+
+# Plot
+dpgpPCAplot = ggplot(PCAvalues, aes(x = PC1, y = PC2, colour = Cluster)) +
+  #  stat_ellipse(level = 0.95, size = 2, show.legend = FALSE) +
+  geom_point(size = 2) +
+  geom_segment(data = PCAloadings, aes(x = 0, y = 0, xend = (PC1), yend = (PC2)),
+               arrow = arrow(length = unit(1/2, "picas")), 
+               color = "black", size=1.5) +
+  geom_text(data = PCAloadings, aes(label = Variables, x = (PC1), y = (PC2)), 
+            color = "black", size = 5, nudge_x = PCAloadings$OffsetPC1, nudge_y = PCAloadings$OffsetPC2) +
+  theme_classic() +
+  theme(legend.justification = c(1,1), legend.position = "right") +
+  scale_color_brewer(palette="Paired") +
+  labs(x = paste0("PC1: ", round(PCApercentvar[1],1), "% variance"), y = paste0("PC2: ", round(PCApercentvar[2],1), "% variance")) +
+  theme(axis.text.x = element_text(size=20), axis.text.y = element_text(size=20), legend.position = "none") +
+  geom_hline(yintercept=0, linetype=2) + geom_vline(xintercept=0, linetype=2) +
+  coord_fixed() +
+  labs_pubr()
+dpgpPCAplot
+ggsave(dpgpPCAplot, filename="./nosva_v4/DPGP/DESeq2/DPGP_pcaplot.tiff", units="in", width=5, height=5, dpi=180)
+```
+
+```{r}
+plot_df_sd = matrix(ncol = length(unique(plot_df$cluster)), nrow = length(unique(plot_df$variable)))
+plot_df_mean = plot_df_sd
+for(i in 1:length(unique(plot_df$variable))){
+  for(j in 1:length(unique(plot_df$cluster))){
+     plot_df_sd[i,j] = sd(subset(plot_df, subset=cluster==j & variable==unique(plot_df$variable)[i])$value)
+     plot_df_mean[i,j] = mean(subset(plot_df, subset=cluster==j & variable==unique(plot_df$variable)[i])$value) 
+  }
+}
+colnames(plot_df_mean) = unique(plot_df$cluster)
+rownames(plot_df_mean) = unique(plot_df$variable)
+colnames(plot_df_sd) = unique(plot_df$cluster)
+rownames(plot_df_sd) = unique(plot_df$variable)
+
+plot_df_mean = melt(plot_df_mean)
+plot_df_sd = melt(plot_df_sd)
+
+ribbon = data.frame(day = plot_df_mean$Var1, cluster = plot_df_mean$Var2, 
+                    mean = plot_df_mean$value,
+                    ymin = plot_df_mean$value - 2*plot_df_sd$value, ymax = plot_df_mean$value + 2*plot_df_sd$value)
+ribbon
+```
+
+```{r}
+p = ggplot(data=ribbon, aes(x=day)) + 
+  geom_ribbon(aes(ymin=ymin, ymax=ymax, group=cluster), fill="gray") +
+  geom_line(aes(y=mean, size=0.01, group=cluster)) +
+  geom_point(aes(y=mean, size=1, stroke=0, color=factor(cluster))) + 
+  geom_hline(yintercept=0, lty=2) +
+  scale_color_brewer(palette="Paired") +
+  theme_bw()
+p = facet(p, facet.by = "cluster",
+          panel.labs = list(cluster=paste0("Cluster ",unique(ribbon$cluster), ", N=", table(dpgp_clust$cluster))),
+          panel.labs.background = list(color="black", fill="gray95"),
+          panel.labs.font = list(size=22, face="bold")) + 
+  theme(legend.position = "none", 
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank()) 
+# strip.background = element_rect(colour="black", fill="gray95", size=1, linetype="solid"  
+# panel.grid.major = element_blank(), panel.grid.minor = element_blank()
+p
+
+ggsave(p, filename="./nosva_v4/DPGP/DESeq2/l2fc_dpgp.tiff", units="in", height = 10, width=12, dpi=320)
+```
+
+```{r}
+hmp_df = assay(rld)[as.character(dpgp_clust$gene),]
+#hmp_symbols = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(hmp_df)), return.type="data.frame")$symbol
+#rownames(hmp_df) = hmp_symbols
+head(hmp_df)
+anno_col <- as.data.frame(colData(rld)[, c("condition","day")])
+anno_col
+anno_row = as.data.frame(cbind(hmp_df[,0], dpgp_clust$cluster))
+anno_row$V1 = unlist(lapply(anno_row$V1, factor))
+anno_row
+
+mycolors <- brewer.pal(length(unique(anno_row$V1)),"Paired")
+names(mycolors) <- unique(anno_row$V1)
+mycolors <- list(V1 = mycolors)
+
+top5clust = lapply(unique(plot_df$cluster), function(x){head(subset(plot_df, subset=cluster==x)[order(abs(subset(plot_df, subset=cluster==x)$value)),],5)})
+top5clust
+
+hmp = pheatmap(hmp_df, annotation_col = anno_col, annotation_row = anno_row,
+               # gaps_row=cumsum(unname(table(dpgp_clust$cluster))),
+               # gaps_col=c(2,4,6,8,9),
+               cluster_rows = F, cluster_cols = F, scale="row",
+               show_rownames = F, show_colnames = F,
+               cellwidth = 30, cellheight = 0.4,
+               color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(200),
+               annotation_legend = F, legend = T,
+               annotation_names_col = F, annotation_names_row = F,
+               annotation_colors = mycolors)
+
+#ggsave(hmp, filename="./nosva_v4/Figures/DE_rld_DPGP_KOvsWT_pheatmap_split.tiff", units="in", width=5.5, height=7, dpi=200, limitsize = FALSE)
+```
+
+# Import gene lists from excel sheet
+```{r}
+library(readxl)
+total_geneList = as.list(read_xlsx(path = "./TargetedGeneLists.xlsx", col_names=TRUE, col_types = "text", sheet = 1))
+names(total_geneList) = c("Qui", "CC", "Infl", "Neur", "Adh", "MuCDiff", "MyoDiff", "Chr", "Wnt", "AMPK", "ROS","mmu03010","SCDiff")
+total_geneList = lapply(total_geneList, function(x) x[!is.na(x)])
+total_geneList_stack = as.data.frame(stack(total_geneList))
+total_geneList_ens = genes(edb, columns="gene_id", filter=SymbolFilter(unlist(total_geneList)), return.type="data.frame")$gene_id
+total_geneList_ens = unlist(lapply(total_geneList_ens, function(x) x[!is.na(x)]))
+```
+
+```{r}
+ht_list_data = t(scale(t(hmp_df), center=T, scale=T))
+
+#ccl_gene = rownames(ht_list_data) %in% genes(edb, columns="gene_id", filter=SymbolFilter(total_geneList$CC), return.type="data.frame")$gene_id
+cc = readRDS("./nosva_v4/RDS/mouse_cell_cycle_gene.rds")
+ccl_gene = rownames(ht_list_data) %in% names(cc)
+rp = readRDS("./nosva_v4/RDS/mouse_ribonucleoprotein.rds")
+rp_gene = rownames(ht_list_data) %in% names(rp)
+ROS_gene = rownames(ht_list_data) %in% genes(edb, columns="gene_id", filter=SymbolFilter(total_geneList$ROS), return.type="data.frame")$gene_id
+Wnt_gene = rownames(ht_list_data) %in% genes(edb, columns="gene_id", filter=SymbolFilter(total_geneList$Wnt), return.type="data.frame")$gene_id
+mmu03010_gene = rownames(ht_list_data) %in% genes(edb, columns="gene_id", filter=SymbolFilter(total_geneList$mmu03010), return.type="data.frame")$gene_id
+SCDiff_gene = rownames(ht_list_data) %in% genes(edb, columns="gene_id", filter=SymbolFilter(total_geneList$SCDiff), return.type="data.frame")$gene_id
+MuCDiff_gene = rownames(ht_list_data) %in% genes(edb, columns="gene_id", filter=SymbolFilter(total_geneList$MuCDiff), return.type="data.frame")$gene_id
+
+mycolors = brewer.pal(11,"Paired")
+names(mycolors) = unique(dpgp_clust$cluster)
+dpgp_clust_ann = rowAnnotation(
+    clust = dpgp_clust$cluster,
+    col = list(clust = mycolors),
+    show_legend = FALSE,
+    width = unit(0.5,"cm")
+    )
+
+ht_list = Heatmap(ht_list_data,
+                  cluster_rows = F, cluster_columns = F,
+                  col = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(200),
+                  left_annotation = dpgp_clust_ann,
+                  # left_annotation = rowAnnotation(clust = anno_block(gp = gpar(fill=brewer.pal(11,"Paired"), col=NA)), show_annotation_name=F,
+                  #                                 width=unit(2,"mm")),
+                  # row_split = dpgp_clust$cluster, column_split = factor(colData(rld)[, "group"], 
+                  #                                                       levels = c("d-0-WT", "d-0-KO", "d-7-WT", "d-7-KO", "d-21-WT", "d-21-KO")),
+                  heatmap_legend_param = list(title = "", at = -3:3, labels = -3:3),
+                  heatmap_width = unit(10, "cm"),
+                  show_row_names = F, show_column_names = F) +
+  Heatmap(ccl_gene + 0, name="CC", width=unit(5,"mm"), col = c("0" = "white", "1" = "red"), show_heatmap_legend = F) +
+#  Heatmap(ROS_gene + 0, name="ROS", width=unit(5,"mm"), col = c("0" = "white", "1" = "red"), show_heatmap_legend = F) +
+#  Heatmap(Wnt_gene + 0, name="Wnt", width=unit(5,"mm"), col = c("0" = "white", "1" = "red"), show_heatmap_legend = F) +
+  Heatmap(mmu03010_gene + 0, name="mmu03010", width=unit(5,"mm"), col = c("0" = "white", "1" = "forestgreen"), show_heatmap_legend = F) +
+#  Heatmap(MuCDiff_gene + 0, name="MuCDiff", width=unit(5,"mm"), col = c("0" = "white", "1" = "red"), show_heatmap_legend = F) +
+  Heatmap(SCDiff_gene + 0, name="SCDiff", width=unit(5,"mm"), col = c("0" = "white", "1" = "purple"), show_heatmap_legend = F) +
+rowAnnotation(link = anno_mark(at = which(SCDiff_gene),
+      labels = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(ht_list_data)[SCDiff_gene]), return.type="data.frame")$symbol,
+      labels_gp = gpar(fontsize = 15, fontface="bold"), padding = unit(1, "mm")))
+# draw(ht_list)
+tiff(filename="./nosva_v4/DPGP/DESeq2/dpgp_complexheatmap.tiff", units="in", width=7, height=7, res=200)
+draw(ht_list)
+dev.off()
+```
+
+# Functional annotation
+```{r}
+library(WebGestaltR)
+listGeneSet()
+```
+
+```{r}
+dpgp_clust_kegg_sym = list()
+dpgp_clust_gobp_sym = list()
+dpgp_clust_kegg_id = list()
+dpgp_clust_gobp_id = list()
+
+for(c in unique(dpgp_clust$cluster)){
+  dpgp_clust_kegg_id[[c]] = WebGestaltR(enrichMethod = "ORA",
+                                     organism = "mmusculus",
+                                     enrichDatabase = "pathway_KEGG",
+                                     interestGene = as.character(subset(dpgp_clust, subset=cluster==c)$gene),
+                                     interestGeneType = "ensembl_gene_id",
+                                     collapseMethod = "mean",
+                                     referenceSet = "genome",
+                                     minNum = 10, maxNum = 500,
+                                     sigMethod = "fdr", fdrMethod = "BH", fdrThr = 0.05,
+                                     reportNum = 30,
+                                     isOutput = T, outputDirectory = "./nosva_v4/DPGP/DESeq2/WebGestaltR",
+                                     projectName = sprintf("DPGP Cluster %d %s", c, "KEGG_geneid"))
+  dpgp_clust_gobp_id[[c]] = WebGestaltR(enrichMethod = "ORA",
+                                     organism = "mmusculus",
+                                     enrichDatabase = "geneontology_Biological_Process_noRedundant",
+                                     interestGene = as.character(subset(dpgp_clust, subset=cluster==c)$gene),
+                                     interestGeneType = "ensembl_gene_id",
+                                     collapseMethod = "mean",
+                                     referenceSet = "genome",
+                                     minNum = 10, maxNum = 500,
+                                     sigMethod = "fdr", fdrMethod = "BH", fdrThr = 0.05,
+                                     reportNum = 30,
+                                     isOutput = T, outputDirectory = "./nosva_v4/DPGP/DESeq2/WebGestaltR",
+                                     projectName = sprintf("DPGP Cluster %d %s",c, "GOBP_geneid"))
+    dpgp_clust_kegg_sym[[c]] = WebGestaltR(enrichMethod = "ORA",
+                                     organism = "mmusculus",
+                                     enrichDatabase = "pathway_KEGG",
+                                     interestGene = subset(dpgp_clust, subset=cluster==c)$symbol,
+                                     interestGeneType = "genesymbol",
+                                     collapseMethod = "mean",
+                                     referenceSet = "genome",
+                                     minNum = 10, maxNum = 500,
+                                     sigMethod = "fdr", fdrMethod = "BH", fdrThr = 0.05,
+                                     reportNum = 30,
+                                     isOutput = T, outputDirectory = "./nosva_v4/DPGP/DESeq2/WebGestaltR",
+                                     projectName = sprintf("DPGP Cluster %d %s", c, "KEGG_symbol"))
+  dpgp_clust_gobp_sym[[c]] = WebGestaltR(enrichMethod = "ORA",
+                                     organism = "mmusculus",
+                                     enrichDatabase = "geneontology_Biological_Process_noRedundant",
+                                     interestGene = as.character(subset(dpgp_clust, subset=cluster==c)$symbol),
+                                     interestGeneType = "genesymbol",
+                                     collapseMethod = "mean",
+                                     referenceSet = "genome",
+                                     minNum = 10, maxNum = 500,
+                                     sigMethod = "fdr", fdrMethod = "BH", fdrThr = 0.05,
+                                     reportNum = 30,
+                                     isOutput = T, outputDirectory = "./nosva_v4/DPGP/DESeq2/WebGestaltR",
+                                     projectName = sprintf("DPGP Cluster %d %s",c, "GOBP_symbol"))
+}
+```
+
+```{r}
+dpgp_clust_gobp_sym = readRDS("./nosva_v4/RDS/dpgp_clust_gobp_sym.RDS")
+dpgp_clust_kegg_sym = readRDS("./nosva_v4/RDS/dpgp_clust_kegg_sym.RDS")
+saveRDS(dpgp_clust_gobp_sym, "./nosva_v4/RDS/dpgp_clust_gobp_sym.RDS")
+saveRDS(dpgp_clust_kegg_sym, "./nosva_v4/RDS/dpgp_clust_kegg_sym.RDS")
+```
+
+```{r}
+dpgp_clust_gobp_id
+dpgp_clust_kegg_id
+saveRDS(dpgp_clust_gobp_id, "./nosva_v4/RDS/dpgp_clust_gobp_id.RDS")
+saveRDS(dpgp_clust_gobp_id, "./nosva_v4/RDS/dpgp_clust_gobp_id.RDS")
+```
+
+```{r}
+dpgp_clust_gobp_sym_df = data.frame(do.call(rbind, dpgp_clust_gobp_sym))
+dpgp_clust_gobp_sym_df$cluster = factor(rep(c(1,3,4,8,9), times=unlist(lapply(dpgp_clust_gobp_sym, nrow))))
+dpgp_clust_gobp_sym_df$description = factor(dpgp_clust_gobp_sym_df$description)
+dpgp_clust_gobp_sym_df
+
+dpgp_clust_kegg_sym_df = data.frame(do.call(rbind, dpgp_clust_kegg_sym))
+dpgp_clust_kegg_sym_df$cluster = factor(rep(c(3,8,9), times=unlist(lapply(dpgp_clust_kegg_sym, nrow))))
+dpgp_clust_kegg_sym_df = dpgp_clust_kegg_sym_df[c(1,2,6),]
+dpgp_clust_kegg_sym_df
+```
+
+# Plot enriched GOBP terms by log10pval
+```{r}
+library(RColorBrewer)
+library(scales)
+my_palette = brewer.pal(11, "Paired")[c(1,3,4,8,9)]
+show_col(my_palette)
+
+dpgp_gobp_plot = ggplot(dpgp_clust_gobp_sym_df, aes(x=reorder(description,FDR), y=-log10(FDR))) +
+  geom_bar(stat="Identity", aes(fill=cluster)) +  
+  coord_flip() +
+  scale_fill_manual(values=my_palette) +
+  theme_bw() + 
+  theme(axis.title = element_blank())
+dpgp_gobp_plot
+
+# Plot affinity propagated terms
+dpgp_clust_gobp_ap_sym_df = subset(dpgp_clust_gobp_sym_df, subset=geneSet %in% c("GO:0043588", "GO:2000027", "GO:0035148",
+                                                                                 "GO:0008544", "GO:0002181", "GO:0048736",
+                                                                                 "GO:0043087",
+                                                                                 "GO:0007059", "GO:1902850", "GO:0045786",
+                                                                                 "GO:0043062"))
+dpgp_clust_gobp_ap_sym_df = rbind(dpgp_clust_gobp_ap_sym_df, dpgp_clust_kegg_sym_df)
+dpgp_clust_gobp_ap_sym_df
+dpgp_clust_gobp_ap_sym_df$description = factor(c("Skin development", "Epidermis development", "Regulation of animal organ morphogenesis",
+                                                 "Tube formation", "Skin development", "Epidermis development", "Cytoplasmic translation", 
+                                                 "Appendage development", "Regulation of GTPase activity", "Chromosome segregation", 
+                                                 "Microtubule cytoskeleton organization involved in mitosis",
+                                                 "Negative regulation of cell cycle", "Extracellular structure organization", 
+                                                 "Ribosome pathway", "Cell cycle pathway","Phagosome pathway"))
+dpgp_clust_gobp_ap_sym_plot = ggplot(dpgp_clust_gobp_ap_sym_df, aes(x=reorder(description,-FDR), y=-log10(FDR))) +
+  geom_bar(stat="identity", aes(fill=cluster)) +
+  coord_flip() +
+  scale_fill_manual(values=my_palette) +
+  scale_x_discrete(position = "left") +
+  theme_bw() + labs_pubr() +
+  labs(y="", x="") +
+  theme(axis.text.x = element_text(face="bold", size=16),
+        axis.text.y = element_text(face="bold", size=16),
+        legend.position = "none", 
+        legend.margin = margin(0,0,0,0), 
+        legend.text = element_text(face="bold",size=9), 
+        legend.title=element_text(size=9),
+        rect = element_rect(fill = "transparent"),
+        panel.background = element_rect(fill = "transparent",colour = NA),
+        plot.background = element_rect(fill = "transparent",colour = NA)) 
+dpgp_clust_gobp_ap_sym_plot
+
+# Plot weighted set cover terms
+# dpgp_clust_gobp_wsc_id_df = subset(dpgp_clust_gobp_id_df, 
+#                                    subset=geneSet %in% c("GO:0043588", "GO:0050673", "GO:0097327", "GO:0001763", "GO:0035148",
+#                                                          "GO:0043588", "GO:0002181", "GO:0001655", "GO:0050673", "GO:0048736", "GO:0042476", "GO:0048863",
+#                                                          "GO:0048285", "GO:0045787", "GO:0010639", "GO:0007059", "GO:0055123", "GO:0022411", "GO:0044770",
+#                                                          "GO:0071103", "GO:0033044", "GO:0000910",
+#                                                          "GO:0043062"))
+# dpgp_clust_gobp_wsc_id_df
+# ggplot(dpgp_clust_gobp_wsc_id_df, aes(x=reorder(description,FDR), y=-log10(FDR))) +
+#   geom_bar(stat="identity", aes(fill=cluster)) +  
+#   coord_flip() +
+#   scale_fill_manual(values=my_palette) +
+#   theme_bw() + 
+#   theme(axis.title = element_blank())
+
+ggsave(dpgp_clust_gobp_ap_sym_plot, filename = "./nosva_v4/DPGP/DESeq2/dpgp_gobp_ap_sym.tiff", units="in", 
+       height=7, width=9, dpi=320, bg="transparent")
+```

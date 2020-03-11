@@ -1,0 +1,25 @@
+userId	geneSymbol	geneName	entrezgene	gLink
+Il11	Il11	interleukin 11	16156	https://www.ncbi.nlm.nih.gov/gene/?term=16156
+Mmp9	Mmp9	matrix metallopeptidase 9	17395	https://www.ncbi.nlm.nih.gov/gene/?term=17395
+Vps13d	Vps13d	vacuolar protein sorting 13D	230895	https://www.ncbi.nlm.nih.gov/gene/?term=230895
+Ppp2r5e	Ppp2r5e	protein phosphatase 2, regulatory subunit B', epsilon	26932	https://www.ncbi.nlm.nih.gov/gene/?term=26932
+Bcl6	Bcl6	B cell leukemia/lymphoma 6	12053	https://www.ncbi.nlm.nih.gov/gene/?term=12053
+Prpf19	Prpf19	pre-mRNA processing factor 19	28000	https://www.ncbi.nlm.nih.gov/gene/?term=28000
+Ankrd1	Ankrd1	ankyrin repeat domain 1 (cardiac muscle)	107765	https://www.ncbi.nlm.nih.gov/gene/?term=107765
+Loxl4	Loxl4	lysyl oxidase-like 4	67573	https://www.ncbi.nlm.nih.gov/gene/?term=67573
+Cd151	Cd151	CD151 antigen	12476	https://www.ncbi.nlm.nih.gov/gene/?term=12476
+Fam189a1	Fam189a1	family with sequence similarity 189, member A1	70638	https://www.ncbi.nlm.nih.gov/gene/?term=70638
+Slc2a6	Slc2a6	solute carrier family 2 (facilitated glucose transporter), member 6	227659	https://www.ncbi.nlm.nih.gov/gene/?term=227659
+Tekt5	Tekt5	tektin 5	70426	https://www.ncbi.nlm.nih.gov/gene/?term=70426
+Cxcr4	Cxcr4	chemokine (C-X-C motif) receptor 4	12767	https://www.ncbi.nlm.nih.gov/gene/?term=12767
+Penk	Penk	preproenkephalin	18619	https://www.ncbi.nlm.nih.gov/gene/?term=18619
+Atp10d	Atp10d	ATPase, class V, type 10D	231287	https://www.ncbi.nlm.nih.gov/gene/?term=231287
+Rasd1	Rasd1	RAS, dexamethasone-induced 1	19416	https://www.ncbi.nlm.nih.gov/gene/?term=19416
+Gm5446	Gm5446	predicted gene 5446	432730	https://www.ncbi.nlm.nih.gov/gene/?term=432730
+Mmp13	Mmp13	matrix metallopeptidase 13	17386	https://www.ncbi.nlm.nih.gov/gene/?term=17386
+Scg2	Scg2	secretogranin II	20254	https://www.ncbi.nlm.nih.gov/gene/?term=20254
+Gm10036	Gm10036	NA	100040551	https://www.ncbi.nlm.nih.gov/gene/?term=100040551
+Ppp1r2-ps4	Ppp1r2-ps4	protein phosphatase 1, regulatory (inhibitor) subunit 2, pseudogene 4	623488	https://www.ncbi.nlm.nih.gov/gene/?term=623488
+Gm10282	Gm10282	NA	100042405	https://www.ncbi.nlm.nih.gov/gene/?term=100042405
+Gm14290	Gm14290	predicted gene 14290	99104	https://www.ncbi.nlm.nih.gov/gene/?term=99104
+Gm9780	Gm9780	predicted gene 9780	100039175	https://www.ncbi.nlm.nih.gov/gene/?term=100039175

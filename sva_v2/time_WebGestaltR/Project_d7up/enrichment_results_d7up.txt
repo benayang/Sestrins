@@ -1,0 +1,4 @@
+geneSet	description	link	size	overlap	expect	enrichmentRatio	pValue	FDR	overlapId	database	userId
+GO:0001503	ossification	http://amigo.geneontology.org/amigo/term/GO:0001503	356	8	0.7554612407939084	10.58955717118308	6.019340963447917e-7	6.753700560988563e-4	12705;15891;17386;17926;18619;20750;239790;329278	geneontology_Biological_Process_noRedundant	Mmp13;Penk;Spp1;Cited1;Myoc;Tnn;Ostn;Ibsp
+mmu04512	ECM-receptor interaction	http://www.kegg.jp/kegg-bin/show_pathway?mmu04512+15891+20750+23928+329278	83	4	0.17613281737610786	22.710134656272146	2.758253026446944e-5	0.015473799478367356	15891;20750;23928;329278	pathway_KEGG	Spp1;Lamc3;Tnn;Ibsp
+GO:0042445	hormone metabolic process	http://amigo.geneontology.org/amigo/term/GO:0042445	208	5	0.44139308450880044	11.32777149321267	7.197402820624532e-5	0.02691828654913575	12903;13082;20750;53419;63993	geneontology_Biological_Process_noRedundant	Crabp1;Cyp26a1;Spp1;Corin;Slc5a7

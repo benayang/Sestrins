@@ -1,0 +1,616 @@
+---
+title: "R Notebook"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r message=FALSE, warning=FALSE}
+library("DESeq2")
+library("tximport")
+library("rhdf5")
+library("EnsDb.Mmusculus.v79")
+library("AnnotationHub")
+library("BiocParallel")
+library("ggplot2")
+library("pheatmap")
+library("dplyr")
+library("ggpubr")
+library("reshape2")
+library("sva")
+#register(MulticoreParam(32))
+```
+
+```{r}
+edb = EnsDb.Mmusculus.v79
+k <- keys(edb, keytype = "TXNAME")
+tx2gene = genes(edb, filter = TxIdFilter(k), columns = c("tx_id","gene_id"), return.type="data.frame")
+```
+
+# Load data
+```{r}
+setwd("C:/Users/NOBEL/Box/Lab Notes/Lab Notes Benjamin/Sestrins/Mouse RNA-Seq")
+# condition = factor(rep(c("WT", "KO"), each=2, times=3), levels = c("WT","KO"))
+# day = factor(rep(c("d-0","d-7","d-21"), each=4), levels = c("d-0","d-7","d-21"))
+# replicate = factor(rep(c("R1","R2"), times=6))
+# 
+# sample_id = paste(day, condition, replicate, sep="-")
+# sample_path = file.path(".", "mm38", paste("MuSC", sample_id, sep="-"))
+# sampleTable = data.frame(sample=as.character(sample_id), condition=condition, day=day, replicate=replicate)
+# sampleTable <- dplyr::mutate(sampleTable, path = sample_path)
+# # s2c$day = as.factor(s2c$day)'
+# sampleTable$group = factor(paste(sampleTable$day,sampleTable$condition,sep = '-'))
+# sampleTable$group = relevel(sampleTable$group, ref="d-0-WT")
+# sampleTable = sampleTable[-9,]
+# sampleTable
+sampleTable = data.frame(sample=list.files("./mm38"), stringsAsFactors=F)
+condition = unlist(lapply(unlist(sampleTable$sample), function(x){unlist(strsplit(x,split="_"))[3]}))
+day = unlist(lapply(unlist(sampleTable$sample), function(x){paste(unlist(strsplit(x,split="_"))[2], collapse="_")}))
+replicate = unlist(lapply(unlist(sampleTable$sample), function(x){unlist(strsplit(x,split="_"))[4]}))
+sampleTable = cbind(sampleTable, 
+                    condition=factor(condition, levels=c("WT","KO")), 
+                    day=factor(day, levels=c("d0","d7","d21")), 
+                    replicate=factor(replicate))
+sampleTable = mutate(sampleTable, group = factor(paste(day,condition,sep="_")))
+sampleTable$group = relevel(sampleTable$group, ref="d0_WT")
+sampleTable = mutate(sampleTable, path = file.path(".","mm38",paste("MuSC",day,condition,replicate,sep="_")))
+sampleTable=sampleTable[order(sampleTable$day),]
+sampleTable = sampleTable[-c(13,14,15),] # remove MuSC-d-21-WT-R3, MuSC-d-21-WT-R4, and MuSC-d-21-WT-R5
+sampleTable
+```
+
+```{r}
+files <- file.path(sampleTable$path, "abundance.h5")
+txi.kallisto <- tximport(files, type = "kallisto",  tx2gene=tx2gene, ignoreTxVersion = TRUE)
+```
+
+```{r}
+saveRDS(txi.kallisto, "./sva_v2/RDS/txi.kallisto.RDS")
+```
+
+```{r}
+dds <- DESeqDataSetFromTximport(txi.kallisto, sampleTable, design = ~ group)
+dds = DESeq(dds)
+keep <- rowSums(counts(dds))>0 # only keep genes that have at least one transcript across all samples
+dds <- dds[keep,]
+resultsNames(dds)
+```
+
+```{r}
+saveRDS(dds, "./sva_v2/RDS/raw_dds.RDS")
+```
+
+```{r}
+dds_cor = cor(counts(dds, normalized=T),  method="spearman")
+rownames(dds_cor) <- paste(dds$sample, sep="-")
+colnames(dds_cor) <- NULL
+tiff(filename="./sva_v2/Figures/dds_spearman.tiff", units="in", width=7, height=5, res=320)
+pheatmap(dds_cor, cluster_rows = F, cluster_cols = F, display_numbers = T, main="dds Spearman Correlation")
+dev.off()
+```
+
+# Visualization.
+```{r}
+# Want variance ranges to remain relatively constant across mean values.
+# Use regularized-logarithm transformation b/c working with small dataset (n<30).
+rld = rlog(dds, blind=FALSE)
+head(assay(rld), 3)
+```
+
+```{r}
+saveRDS(rld, "./sva_v2/RDS/rld.RDS")
+```
+
+```{r}
+library("vsn")
+tiff(filename="./sva_v2/Figures/dds_rld_meanSD.tiff")
+dds_rld = meanSdPlot(assay(rld)) # SD looks fairly constant with rld transformation
+# Note that the vertical axis in such plots is the square root of the variance over all samples, so including the variance due to the experimental conditions. While a flat curve of the square root of variance over the mean may seem like the goal of such transformations, this may be unreasonable in the case of datasets with many true differences due to the experimental conditions.
+dev.off()
+```
+ 
+```{r}
+sampleDists <- dist(t(assay(rld)))
+sampleDists
+
+sampleDistMatrix <- as.matrix( sampleDists )
+rownames(sampleDistMatrix) <- paste(rld$sample, sep="-")
+colnames(sampleDistMatrix) <- NULL
+colors <- colorRampPalette( rev(brewer.pal(9, "Blues")) )(255)
+pheatmap(sampleDistMatrix,
+         main="Distance Matrix",
+         clustering_distance_rows = sampleDists,
+         clustering_distance_cols = sampleDists,
+         color = colors)
+
+# A heatmap of this distance matrix gives us an overview over similarities and dissimilarities between samples. We have to provide a hierarchical clustering hc to the heatmap function based on the sample distances, or else the heatmap function would calculate a clustering based on the distances between the rows/columns of the distance matrix.
+```
+
+# Define custom PCA plotting function
+```{r}
+# implement custom version of DESeq2 plotPCA
+plotPCACustom = function(rld){
+  rv = rowVars(assay(rld))
+  select = order(rv, decreasing=T)[seq_len(min(500, length(rv)))]
+  rld_PCA = prcomp(t(assay(rld)[select,]), center=T, scale=F) # clustering variables not genes, don't scale as rlog already scaled
+  # https://support.bioconductor.org/p/100069/
+  summary(rld_PCA)
+  percent_var = (rld_PCA$sdev^2 / sum(rld_PCA$sdev^2)) * 100
+  rld_PCA_df = data.frame(rld_PCA$x, sampleTable)
+  # dds_pca = ggplot(data=rld_PCA_df,
+  #                  aes(x=rld_PCA_df$PC1,
+  #                      y=rld_PCA_df$PC2,
+  #                      shape=rld_PCA_df$day,
+  #                      color=factor(rld_PCA_df$condition, levels=c("WT","KO")),
+  #                      label=rld_PCA_df$replicate))+
+  #   coord_fixed()+
+  #   geom_point(size=5)+
+  #   geom_text(nudge_x=2,nudge_y = 2,size=2)+
+  #   scale_color_manual(values=c('#e41a1c','#377eb8','#4daf4a','#984ea3','#ff7f00'))+
+  #   labs(x = paste0("PC1: ", round(percent_var[1],1), "% variance"), y = paste0("PC2: ", round(percent_var[2],1), "% variance"))+
+  #   theme_bw() + labs_pubr()
+  dds_pca = ggscatter(rld_PCA_df, x="PC1", y="PC2",
+                      color="condition", shape="day",
+                      palette = "lancet",
+                      size=3,
+                      legend = "right") +
+    coord_fixed() +
+    labs(x = paste0("PC1: ", round(percent_var[1],1), "% variance"), y = paste0("PC2: ", round(percent_var[2],1), "% variance")) +
+    theme(axis.title.x = element_text(size=12), axis.title.y = element_text(size=12)) +
+    theme_bw() + labs_pubr()
+  return(dds_pca)
+}
+# pcaData <- plotPCA(rld, intgroup = c( "condition", "day"), returnData = TRUE)
+# percentVar <- round(100 * attr(pcaData, "percentVar"))
+
+# dds_pca = ggplot(pcaData, aes(x = PC1, y = PC2, color = condition, shape = day)) +
+#        geom_point(size=5) +
+#        xlab(paste0("PC1: ", percentVar[1], "% variance")) +
+#        ylab(paste0("PC2: ", percentVar[2], "% variance")) +
+#    theme_pubr()
+# dds_pca
+
+# ggsave(dds_pca, filename="./nosva_v4/Figures/rlog_pca_uncorrected.tiff", 
+#        width=5, height=4, units="in", dpi=320)
+```
+
+```{r}
+# Heatmap of count matrix
+select <- order(rowMeans(counts(dds,normalized=TRUE)), decreasing=TRUE)[1:100]
+df <- as.data.frame(colData(dds)[,c("condition","day")])
+
+count_hmp = assay(rld)[select,]
+rownames(count_hmp) = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(count_hmp)), return.type="data.frame")$symbol
+#colnames(count_hmp) = paste(df$condition, df$day, c("R1","R2"), sep="-")
+tiff(filename="./sva_v2/Figures/dds_countmatrix_pheatmap.tiff", res=100)
+pheatmap(count_hmp, cluster_rows=TRUE, show_rownames=TRUE, scale="row", cellwidth = 15,
+         cluster_cols=F, annotation_col=df)
+
+dev.off()
+```
+
+# Running SVA correction
+```{r}
+# svaseq function begins with log transform of count data.
+dat  <- assay(rld)
+idx  <- rowMeans(dat) > 1
+dat  <- dat[idx, ]
+mod  <- model.matrix(~ 0 + group, colData(dds))
+mod0 <- model.matrix(~ 1, colData(dds))
+num.sv(dat, mod, method="be", B=20)
+svseq <- svaseq(dat, mod, mod0, n.sv=1)
+plot(svseq$sv, col="blue", pch=19)
+
+pValues = f.pvalue(dat,mod,mod0)
+qValues = p.adjust(pValues,method="BH")
+sum(qValues<0.01)/length(qValues) # 29.7% genes are differentially expressed at FDR<5%
+modSv = cbind(mod,svseq$sv)
+mod0Sv = cbind(mod0,svseq$sv)
+pValuesSv = f.pvalue(dat,modSv,mod0Sv)
+qValuesSv = p.adjust(pValuesSv,method="BH")
+sum(qValuesSv<0.01)/length(qValuesSv) # 26.8% genes are differentially expressed at FDR<5% after SVA correction
+
+tiff(filename="./sva_v2/Figures/dds_SV1_plots.tiff", units="in", width=7, height=5, res=180)
+par(mfrow = c(2, 1), mar = c(3,5,3,1))
+stripchart(svseq$sv[,1] ~ dds$day,vertical=TRUE,main="SV1")
+abline(h=0)
+stripchart(svseq$sv[,1] ~ dds$group,vertical=TRUE,main="SV1")
+abline(h=0)
+dev.off()
+
+ddssva <- dds
+ddssva$SV1 <- svseq$sv[,1]
+design(ddssva) <- ~ SV1 + group
+ddssva <- DESeq(ddssva)
+ddssva = ddssva[rowSums(counts(dds)) > 0, ]
+```
+
+```{r}
+ddssva_cor = cor(counts(ddssva, normalized=T),  method="spearman")
+rownames(ddssva_cor) <- paste(ddssva$sample, sep="-")
+colnames(ddssva_cor) <- NULL
+
+tiff(filename="./sva_v2/Figures/ddssva_spearman.tiff", units="in", width=7, height=5, res=320)
+pheatmap(ddssva_cor, cluster_rows = F, cluster_cols = F, display_numbers = T, main="ddssva Spearman Correlation")
+dev.off()
+```
+
+```{r}
+# https://support.bioconductor.org/p/76099/ (use limma to actually remove batch effects, not just model them)
+# http://bioconductor.org/packages/devel/bioc/vignettes/DESeq2/inst/doc/DESeq2.html#how-do-i-use-vst-or-rlog-data-for-differential-testing
+# https://support.bioconductor.org/p/83748/
+
+sva_rld = rlog(ddssva, blind=F)
+head(assay(sva_rld))
+
+sva_rld_mod = sva_rld
+sur_var = data.frame(svseq$sv)
+sur_var
+assay(sva_rld_mod) = limma::removeBatchEffect(assay(sva_rld_mod), covariates=sur_var,
+                                              design=model.matrix(~0+group,data=sampleTable))
+
+sva_rld_mod_plot = plotPCACustom(sva_rld_mod) + theme(legend.position="top",
+                                                      legend.justification="centre",
+                                                      legend.margin=margin(0,0,0,0),
+                                                      legend.box.margin=margin(-10,-10,-10,-10),
+                                                      legend.text = element_text(size=12)) +
+  guides(shape = guide_legend(override.aes = list(size = 3)))
+sva_rld_mod_plot
+       
+ggsave(sva_rld_mod_plot, filename="./sva_v2/Figures/svarldmod_pca.tiff", 
+       width=5, height=2.75, units="in", dpi=320)
+
+ggsave(plotPCACustom(sva_rld), filename="./sva_v2/Figures/svarld_pca.tiff", 
+       width=5, height=2.5, units="in", dpi=320)
+# ggsave(plotPCACustom(sva_rld_mod), filename="./sva_v2/Figures/svarldmod_pca.tiff", 
+#        width=5, height=2.5, units="in", dpi=320)
+ggsave(plotPCACustom(rld), filename="./sva_v2/Figures/rld_pca.tiff", 
+       width=5, height=2.5, units="in", dpi=320)
+```
+
+```{r}
+saveRDS(sva_rld_mod, "./sva_v2/RDS/sva_rld_mod.RDS")
+```
+
+# Create LFC shrunken results objects for KO vs WT each day
+```{r}
+res_d0 = results(ddssva, name="group_d0_KO_vs_d0_WT", pAdjustMethod = "fdr")
+resLFC_d0 = lfcShrink(ddssva, res=res_d0, coef="group_d0_KO_vs_d0_WT", type="ashr")
+resLFC_d0$Symbol = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(resLFC_d0)), return.type="data.frame")$symbol
+resLFC_d0 = resLFC_d0[order(resLFC_d0$padj),]
+
+res_d7 = results(ddssva, contrast=c("group","d7_KO","d7_WT"), pAdjustMethod = "fdr")
+resLFC_d7 = lfcShrink(ddssva, res=res_d7, contrast=c("group","d7_KO","d7_WT"), type="ashr")
+resLFC_d7$Symbol = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(resLFC_d7)), return.type="data.frame")$symbol
+resLFC_d7 = resLFC_d7[order(resLFC_d7$padj),]
+
+res_d21 = results(ddssva, contrast=c("group","d21_KO","d21_WT"), pAdjustMethod = "fdr")
+resLFC_d21 = lfcShrink(ddssva, res=res_d21, contrast=c("group","d21_KO","d21_WT"), type="ashr")
+resLFC_d21$Symbol = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(resLFC_d21)), return.type="data.frame")$symbol
+resLFC_d21 = resLFC_d21[order(resLFC_d21$padj),]
+
+summary(resLFC_d0)
+summary(resLFC_d7)
+summary(resLFC_d21)
+```
+
+```{r}
+saveRDS(resLFC_d0, "./sva_v2/RDS/resLFC_d0.RDS")
+saveRDS(resLFC_d7, "./sva_v2/RDS/resLFC_d7.RDS")
+saveRDS(resLFC_d21, "./sva_v2/RDS/resLFC_d21.RDS")
+```
+
+## Day 0 different significance levels
+```{r}
+resLFC_d0_Down_Sig0.1 = subset(resLFC_d0, subset=(padj<=0.1 & log2FoldChange<=-1))
+resLFC_d0_Up_Sig0.1 = subset(resLFC_d0, subset=(padj<=0.1 & log2FoldChange>=1))
+summary(resLFC_d0_Down_Sig0.1)
+summary(resLFC_d0_Up_Sig0.1)
+
+resLFC_d0_Down_Sig0.05 = subset(resLFC_d0, subset=(padj<=0.05 & log2FoldChange<=-1))
+resLFC_d0_Up_Sig0.05 = subset(resLFC_d0, subset=(padj<=0.05 & log2FoldChange>=1))
+summary(resLFC_d0_Down_Sig0.05)
+summary(resLFC_d0_Up_Sig0.05)
+
+resLFC_d0_Down_Sig0.01 = subset(resLFC_d0, subset=(padj<=0.01 & log2FoldChange<=-1))
+resLFC_d0_Up_Sig0.01 = subset(resLFC_d0, subset=(padj<=0.01 & log2FoldChange>=1))
+summary(resLFC_d0_Down_Sig0.01)
+summary(resLFC_d0_Up_Sig0.01)
+
+write.csv(resLFC_d0_Down_Sig0.1, file="./sva_v2/d0_sig0.1_down_l2fc1.csv")
+write.csv(resLFC_d0_Up_Sig0.1, file="./sva_v2/d0_sig0.1_up_l2fc1.csv")
+write.csv(resLFC_d0_Down_Sig0.05, file="./sva_v2/d0_sig0.05_down_l2fc1.csv")
+write.csv(resLFC_d0_Up_Sig0.05, file="./sva_v2/d0_sig0.05_up_l2fc1.csv")
+write.csv(resLFC_d0_Down_Sig0.01, file="./sva_v2/d0_sig0.01_down_l2fc1.csv")
+write.csv(resLFC_d0_Up_Sig0.01, file="./sva_v2/d0_sig0.01_up_l2fc1.csv")
+```
+
+## Day 7 different significance levels
+```{r}
+resLFC_d7_Down_Sig0.1 = subset(resLFC_d7, subset=(padj<=0.1 & log2FoldChange<=-1))
+resLFC_d7_Up_Sig0.1 = subset(resLFC_d7, subset=(padj<=0.1 & log2FoldChange>=1))
+summary(resLFC_d7_Down_Sig0.1)
+summary(resLFC_d7_Up_Sig0.1)
+
+resLFC_d7_Down_Sig0.05 = subset(resLFC_d7, subset=(padj<=0.05 & log2FoldChange<=-1))
+resLFC_d7_Up_Sig0.05 = subset(resLFC_d7, subset=(padj<=0.05 & log2FoldChange>=1))
+summary(resLFC_d7_Down_Sig0.05)
+summary(resLFC_d7_Up_Sig0.05)
+
+resLFC_d7_Down_Sig0.01 = subset(resLFC_d7, subset=(padj<=0.01 & log2FoldChange<=-1))
+resLFC_d7_Up_Sig0.01 = subset(resLFC_d7, subset=(padj<=0.01 & log2FoldChange>=1))
+summary(resLFC_d7_Down_Sig0.01)
+summary(resLFC_d7_Up_Sig0.01)
+
+write.csv(resLFC_d7_Down_Sig0.1, file="./sva_v2/d7_sig0.1_down_l2fc1.csv")
+write.csv(resLFC_d7_Up_Sig0.1, file="./sva_v2/d7_sig0.1_up_l2fc1.csv")
+write.csv(resLFC_d7_Down_Sig0.05, file="./sva_v2/d7_sig0.05_down_l2fc1.csv")
+write.csv(resLFC_d7_Up_Sig0.05, file="./sva_v2/d7_sig0.05_up_l2fc1.csv")
+write.csv(resLFC_d7_Down_Sig0.01, file="./sva_v2/d7_sig0.01_down_l2fc1.csv")
+write.csv(resLFC_d7_Up_Sig0.01, file="./sva_v2/d7_sig0.01_up_l2fc1.csv")
+```
+
+## Day 21 different significance levels
+```{r}
+resLFC_d21_Down_Sig0.1 = subset(resLFC_d21, subset=(padj<=0.1 & log2FoldChange<=-1))
+resLFC_d21_Up_Sig0.1 = subset(resLFC_d21, subset=(padj<=0.1 & log2FoldChange>=1))
+summary(resLFC_d21_Down_Sig0.1)
+summary(resLFC_d21_Up_Sig0.1)
+
+resLFC_d21_Down_Sig0.05 = subset(resLFC_d21, subset=(padj<=0.05 & log2FoldChange<=-1))
+resLFC_d21_Up_Sig0.05 = subset(resLFC_d21, subset=(padj<=0.05 & log2FoldChange>=1))
+summary(resLFC_d21_Down_Sig0.05)
+summary(resLFC_d21_Up_Sig0.05)
+
+resLFC_d21_Down_Sig0.01 = subset(resLFC_d21, subset=(padj<=0.01 & log2FoldChange<=-1))
+resLFC_d21_Up_Sig0.01 = subset(resLFC_d21, subset=(padj<=0.01 & log2FoldChange>=1))
+summary(resLFC_d21_Down_Sig0.01)
+summary(resLFC_d21_Up_Sig0.01)
+
+write.csv(resLFC_d21_Down_Sig0.1, file="./sva_v2/d21_sig0.1_down_l2fc1.csv")
+write.csv(resLFC_d21_Up_Sig0.1, file="./sva_v2/d21_sig0.1_up_l2fc1.csv")
+write.csv(resLFC_d21_Down_Sig0.05, file="./sva_v2/d21_sig0.05_down_l2fc1.csv")
+write.csv(resLFC_d21_Up_Sig0.05, file="./sva_v2/d21_sig0.05_up_l2fc1.csv")
+write.csv(resLFC_d21_Down_Sig0.01, file="./sva_v2/d21_sig0.01_down_l2fc1.csv")
+write.csv(resLFC_d21_Up_Sig0.01, file="./sva_v2/d21_sig0.01_up_l2fc1.csv")
+```
+
+# Complex heatmap
+```{r dpi=200}
+library("genefilter")
+library("pheatmap")
+library("RColorBrewer")
+library(ComplexHeatmap)
+
+#topVarGenes <- head(order(rowVars(assay(rld)), decreasing = TRUE), 50)
+d0_d7_d21_int = list(d0=rownames(subset(resLFC_d0, subset=(padj<=0.01 & abs(log2FoldChange)>=1))),
+                     d7=rownames(subset(resLFC_d7, subset=(padj<=0.01 & abs(log2FoldChange)>=1))),
+                     d21=rownames(subset(resLFC_d21, subset=(padj<=0.01 & abs(log2FoldChange)>=1))))
+topVarGenes <- unlist(lapply(unique(unlist(d0_d7_d21_int)), FUN = function(x) {match(x,rownames(assay(sva_rld_mod)))}))
+
+mat  <- assay(sva_rld_mod)[ topVarGenes, ]
+#mat  <- mat - rowMeans(mat)
+topVarGeneSymbols = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(mat)), return.type="data.frame")$symbol
+rownames(mat) = topVarGeneSymbols
+anno_col <- as.data.frame(colData(sva_rld_mod)[, c("condition","day")])
+
+hmp = pheatmap(mat, annotation_col=anno_col, cluster_rows=T, cluster_cols=F, scale="row", 
+               show_rownames = F, show_colnames = F, treeheight_row = 0,
+               cellwidth = 30, cellheight=0.4, border_color = NA,
+               color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(200),
+               annotation_legend = F, legend = F)
+
+# hmp = pheatmap(mat, annotation_col = anno_col, annotation_row = anno_row, scale="row", 
+#                color = colorRampPalette(rev(brewer.pal(n = 7, name = "RdBu")))(200),
+#                show_colnames = FALSE, show_rownames = FALSE, fontsize_row = 8,
+#                cellwidth = 30, cellheight=0.4, border_color = NA,
+#                cluster_rows = TRUE, cluster_cols = FALSE, treeheight_row = 0,
+#                annotation_legend = TRUE, legend = TRUE) 
+
+ggsave(hmp, filename="./sva_v2/Figures/DE_svarldmod_KOvsWT_pheatmap.tiff", units="in", 
+       width=6, height=6, dpi=200, limitsize = FALSE)
+ggsave(hmp, filename="./sva_v2/Figures/test_pheatmap.tiff", units="in", 
+       width=6, height=7, dpi=200, limitsize = FALSE)
+```
+
+```{r}
+head(rownames(mat[hmp$tree_row[["order"]],]))
+hmp_clust = sort(cutree(hmp$tree_row, k=11))
+hmp_clust = as.data.frame(hmp_clust, row.names=names(hmp_clust))
+hmp_clust$dpgp_clust = hmp_clust[rownames(anno_row),]
+hmp_clust
+```
+
+```{r}
+library("EnhancedVolcano")
+# The default cut-off for log2FC is >|2|; the default cut-off for P value is 10e-6.
+tiff(filename="./sva_v2/Figures/svarldmod_d0_volcano.tiff", units="in", width=7, height=5, res=180)
+EnhancedVolcano(resLFC_d0,
+                lab = resLFC_d0$Symbol,
+                title = NULL, subtitle = NULL, caption = NULL,
+                ylab = bquote(~-Log[10]~adjusted~italic(P)),
+                labSize = 4.0,
+                pCutoff = 10e-6,
+                FCcutoff = 1,
+                legendPosition ="top",
+                x = 'log2FoldChange',
+                y = 'pvalue',
+                border = "full",
+                borderWidth = 1.0)
+  # ggplot2::coord_cartesian(xlim=c(-10, 10)) +
+  # ggplot2::scale_x_continuous(breaks=seq(-10,10, 2))
+dev.off()
+# EnhancedVolcano(resLFC_d7,
+#   lab = resLFC_d7$Symbol,
+#   title = "Day 7 (KO vs WT) - 0.01 FDR",
+#   ylab = bquote(~-Log[10]~adjusted~italic(P)),
+#   pCutoff = 0.05,
+#   x = 'log2FoldChange',
+#   y = 'padj')
+# EnhancedVolcano(resLFC_d21,
+#   lab = resLFC_d21$Symbol,
+#   title = "Day 21 (KO vs WT) - 0.01 FDR",
+#   ylab = bquote(~-Log[10]~adjusted~italic(P)),
+#   pCutoff = 0.01,
+#   x = 'log2FoldChange',
+#   y = 'padj')
+```
+
+```{r}
+DESeq2::plotMA(resLFC_d0, ylim=c(-12,12), main="Day 0 (KO vs WT) - 0.1 FDR")
+DESeq2::plotMA(resLFC_d7, ylim=c(-12,12), main="Day 7 (KO vs WT) - 0.05 FDR")
+DESeq2::plotMA(resLFC_d21, ylim=c(-12,12), main="Day 21 (KO vs WT) - 0.01 FDR")
+```
+
+# Venn Diagram of each day's DE genes
+```{r}
+library(ggVennDiagram)
+# d0_d7_d21_int = list(d0=rownames(subset(resLFC_d0, subset=(padj<=0.01 & abs(log2FoldChange)>=1))),
+#                      d7=rownames(subset(resLFC_d7, subset=(padj<=0.01 & abs(log2FoldChange)>=1))),
+#                      d21=rownames(subset(resLFC_d21, subset=(padj<=0.01 & abs(log2FoldChange)>=1))))
+d0_d7_d21_venn = ggVennDiagram(d0_d7_d21_int, lty=1, lwd=1, color="black") + theme(text=element_text(size=16, family="sans"))
+d0_d7_d21_venn_nolabel = ggVennDiagram(d0_d7_d21_int, lty=1, lwd=0.75, color="black", label=NULL) + 
+  theme(text=element_text(size=16, family="sans"))
+d0_d7_d21_venn
+d0_d7_d21_venn_nolabel
+ggexport(d0_d7_d21_venn, filename="./sva_v2/Figures/sva_rld_mod_d0_d7_d21_DE_venn.tiff", dpi=320)
+ggexport(d0_d7_d21_venn_nolabel, filename="./nosva_v4/Figures/d0_d7_d21_DE_venn_nolabel.tiff", dpi=320)
+```
+
+```{r}
+d0_d7_d21_int_mat = make_comb_mat(d0_d7_d21_int)
+set_size(d0_d7_d21_int_mat)
+UpSet(d0_d7_d21_int_mat)
+```
+
+```{r}
+library(VennDiagram)
+
+library(RColorBrewer)
+myCol <- brewer.pal(3, "Pastel2")
+
+venn.diagram(d0_d7_d21_int,
+             category.names = c("d0", "d7", "d21"),
+             imagetype = "tiff", resolution = 320,
+             filename="./nosva_v4/Figures/d0_d7_d21_DE_venn.tiff", output=TRUE,
+             
+             # Circles
+            lwd = 2,
+            lty = 'blank',
+            fill = myCol,
+            
+            # Numbers
+            cex = 2,
+            fontface = "bold",
+            fontfamily = "sans",
+            
+            # Set names
+        cat.cex = 2,
+        cat.fontface = "bold",
+        cat.default.pos = "outer",
+        cat.pos = c(-27, 27, 135),
+        cat.dist = c(0.055, 0.035, 0.085),
+        cat.fontfamily = "sans",
+        rotation = 1
+)
+
+```
+
+## Create LFC shrunken results objects for KO vs d.0.WT for each day
+```{r}
+res_d7_d0 = results(ddssva, name = "group_d.7.KO_vs_d.0.WT", pAdjustMethod = "fdr")
+resLFC_d7_d0 = lfcShrink(ddssva, res=res_d7_d0, coef = "group_d.7.KO_vs_d.0.WT", type="ashr")
+resLFC_d7_d0$Symbol = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(resLFC_d7_d0)), return.type="data.frame")$symbol
+resLFC_d7_d0 = resLFC_d7_d0[order(resLFC_d7_d0$padj),]
+
+res_d21_d0 = results(ddssva, name = "group_d.21.KO_vs_d.0.WT", pAdjustMethod = "fdr")
+resLFC_d21_d0 = lfcShrink(ddssva, res=res_d21_d0, coef = "group_d.21.KO_vs_d.0.WT", type="ashr")
+resLFC_d21_d0$Symbol = genes(edb, columns="symbol", filter=GeneIdFilter(rownames(resLFC_d21_d0)), return.type="data.frame")$symbol
+resLFC_d21_d0 = resLFC_d21_d0[order(resLFC_d21_d0$padj),]
+
+summary(resLFC_d7_d0)
+summary(resLFC_d21_d0)
+```
+
+# Venn Diagram of KO vs d.0.WT for each day
+```{r}
+d0_d7_d21_int_d0WT = list(d0=rownames(subset(resLFC_d0, subset=(padj<=0.01 & abs(log2FoldChange)>=1))),
+                     d7=rownames(subset(resLFC_d7_d0, subset=(padj<=0.01 & abs(log2FoldChange)>=1))),
+                     d21=rownames(subset(resLFC_d21_d0, subset=(padj<=0.01 & abs(log2FoldChange)>=1))))
+d0_d7_d21_int_d0WT_up = list(d0=rownames(subset(resLFC_d0, subset=(padj<=0.01 & log2FoldChange>=1))),
+                     d7=rownames(subset(resLFC_d7_d0, subset=(padj<=0.01 & log2FoldChange>=1))),
+                     d21=rownames(subset(resLFC_d21_d0, subset=(padj<=0.01 & log2FoldChange>=1))))
+d0_d7_d21_int_d0WT_down = list(d0=rownames(subset(resLFC_d0, subset=(padj<=0.01 & log2FoldChange<=-1))),
+                     d7=rownames(subset(resLFC_d7_d0, subset=(padj<=0.01 & log2FoldChange<=-1))),
+                     d21=rownames(subset(resLFC_d21_d0, subset=(padj<=0.01 & log2FoldChange<=-1))))
+
+d0_d7_d21_venn = ggVennDiagram(d0_d7_d21_int_d0WT, lty=1, lwd=0.75, color="black", n.sides=5e4) + theme(text=element_text(size=16, family="sans"))
+d0_d7_d21_venn_up = ggVennDiagram(d0_d7_d21_int_d0WT_up, lty=1, lwd=0.75, color="black", n.sides=5e4) + theme(text=element_text(size=16, family="sans"))
+d0_d7_d21_venn_down = ggVennDiagram(d0_d7_d21_int_d0WT_down, lty=1, lwd=0.75, color="black", n.sides=5e4) + theme(text=element_text(size=16, family="sans"))
+
+d0_d7_d21_venn
+d0_d7_d21_venn_up
+d0_d7_d21_venn_down
+
+ggexport(d0_d7_d21_venn, filename="./nosva_v4/Figures/d0_d7_d21_DE_vsd0WT_venn.tiff", dpi=320)
+ggexport(d0_d7_d21_venn_up, filename="./nosva_v4/Figures/d0_d7_d21_DE_vsd0WT_venn_up.tiff", dpi=320)
+ggexport(d0_d7_d21_venn_down, filename="./nosva_v4/Figures/d0_d7_d21_DE_vsd0WT_venn_down.tiff", dpi=320)
+```
+
+```{r}
+library(VennDiagram)
+venn_d0WT_up = get.venn.partitions(x = d0_d7_d21_int_d0WT_up, keep.elements = TRUE)
+venn_d0WT_down = get.venn.partitions(x = d0_d7_d21_int_d0WT_down, keep.elements = TRUE)
+head(venn_d0WT_up)
+write.csv(venn_d0WT_up$..values..$`1`, file="./nosva_v4/d0_d7_d21_int_d0WT_up.csv")
+write.csv(venn_d0WT_down$..values..$`1`, file="./nosva_v4/d0_d7_d21_int_d0WT_down.csv")
+```
+
+# Gene Lists
+```{r}
+ROS_genes = c("Sesn1", "Sesn2", "Sesn3", 
+              "Foxo1", "Foxo3", "Foxo4", "Foxo6",
+              "Nfe2l2", "Gadd45a", "Prkaa1", "Prkaa2", "Prx", "Srxn1", 
+              "Keap1")
+# ROS_genes_ens = genes(edb, columns="symbol", filter=SymbolFilter(ROS_genes), return.type="data.frame")$gene_id
+# res_d0[ROS_genes_ens,]
+ROS_genes = c("ENSMUSG00000038332","ENSMUSG00000028893","ENSMUSG00000032009", "ENSMUSG00000026773",
+              "ENSMUSG00000044167", "ENSMUSG00000048756", "ENSMUSG00000042903", "ENSMUSG00000052135",
+              "ENSMUSG00000015839", "ENSMUSG00000036390", "ENSMUSG00000050697", "ENSMUSG00000028518",
+              "ENSMUSG00000032802", "ENSMUSG00000053198", "ENSMUSG00000003308", "ENSMUSG00000028991",
+              "ENSMUSG00000029167", "ENSMUSG00000029512", "ENSMUSG00000004798", "ENSMUSG00000059552",
+              "ENSMUSG00000037211", "ENSMUSG00000056501", "ENSMUSG00000022146", "ENSMUSG00000058755",
+              "ENSMUSG00000028736", "ENSMUSG00000026459", "ENSMUSG00000009214", "ENSMUSG00000079471",
+              "ENSMUSG00000020908", "ENSMUSG00000033196", "ENSMUSG00000056328", "ENSMUSG00000055775",
+              "ENSMUSG00000057003", "ENSMUSG00000028991", "ENSMUSG00000020516", "ENSMUSG00000025583",
+              "ENSMUSG00000050310")
+resLFC_d0[ROS_genes,]
+resLFC_d0[ROS_genes,]$Symbol
+```
+
+```{r}
+ROS_df = subset(as.data.frame(resLFC_d0[ROS_genes,]), select=c("Symbol", "log2FoldChange", "padj", "lfcSE"))
+ROS_df$log10padj = -log10(ROS_df$padj)
+ROS_df$error_up = ROS_df$log2FoldChange + ROS_df$lfcSE
+ROS_df$error_down = ROS_df$log2FoldChange - ROS_df$lfcSE
+ROS_df = subset(ROS_df, subset = padj<0.01)
+ROS_df
+
+ROS_bar = ggbarplot(ROS_df, x="Symbol", y="log2FoldChange",
+                    fill = "log10padj", color = "white",
+                    sort.val = "asc", sort.by.groups = TRUE) + 
+  gradient_fill("RdBu") +
+  coord_flip() +
+  scale_x_discrete(position = "left") +
+  labs_pubr() +
+  geom_errorbar(data=ROS_df, aes(x=Symbol, ymin=error_down, ymax=error_up), width=0.4, size=1)
+
+ROS_bar = ggpar(ROS_bar, legend = c(0.15,0.80), legend.title = "-log10(padj)", font.legend = c(14),
+                font.xtickslab = 14, font.ytickslab = 14, 
+                orientation = "horiz", xlab = FALSE, ylab = FALSE)
+
+ROS_bar
+
+ggexport(ROS_bar, filename="./sva_v2/Figures/resLFCd0_ROS_bar.tiff", width=800, height=600, res=150)
+```

@@ -1,0 +1,3 @@
+geneSet	description	link	size	overlap	expect	enrichmentRatio	pValue	FDR	overlapId	userId
+GO:0072593	reactive oxygen species metabolic process	http://amigo.geneontology.org/amigo/term/GO:0072593	268	4	0.23121719749802289	17.299751243781092	5.9063147312299336e-5	0.026140135336664372	20963;22333;140742;230784	Vdac1;Syk;Sesn2;Sesn1
+GO:0034504	protein localization to nucleus	http://amigo.geneontology.org/amigo/term/GO:0034504	274	4	0.2363937019196204	16.920924574209245	6.438456979473983e-5	0.026140135336664372	20963;230500;230784;245038	Syk;Sesn2;Dclk3;Efcab7

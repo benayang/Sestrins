@@ -1,0 +1,21 @@
+userId	geneSymbol	geneName	entrezgene	gLink
+ENSMUSG00000004371	Il11	interleukin 11	16156	https://www.ncbi.nlm.nih.gov/gene/?term=16156
+ENSMUSG00000017737	Mmp9	matrix metallopeptidase 9	17395	https://www.ncbi.nlm.nih.gov/gene/?term=17395
+ENSMUSG00000020220	Vps13d	vacuolar protein sorting 13D	230895	https://www.ncbi.nlm.nih.gov/gene/?term=230895
+ENSMUSG00000021051	Ppp2r5e	protein phosphatase 2, regulatory subunit B', epsilon	26932	https://www.ncbi.nlm.nih.gov/gene/?term=26932
+ENSMUSG00000022508	Bcl6	B cell leukemia/lymphoma 6	12053	https://www.ncbi.nlm.nih.gov/gene/?term=12053
+ENSMUSG00000024735	Prpf19	pre-mRNA processing factor 19	28000	https://www.ncbi.nlm.nih.gov/gene/?term=28000
+ENSMUSG00000024803	Ankrd1	ankyrin repeat domain 1 (cardiac muscle)	107765	https://www.ncbi.nlm.nih.gov/gene/?term=107765
+ENSMUSG00000025185	Loxl4	lysyl oxidase-like 4	67573	https://www.ncbi.nlm.nih.gov/gene/?term=67573
+ENSMUSG00000025510	Cd151	CD151 antigen	12476	https://www.ncbi.nlm.nih.gov/gene/?term=12476
+ENSMUSG00000030518	Fam189a1	family with sequence similarity 189, member A1	70638	https://www.ncbi.nlm.nih.gov/gene/?term=70638
+ENSMUSG00000036067	Slc2a6	solute carrier family 2 (facilitated glucose transporter), member 6	227659	https://www.ncbi.nlm.nih.gov/gene/?term=227659
+ENSMUSG00000039179	Tekt5	tektin 5	70426	https://www.ncbi.nlm.nih.gov/gene/?term=70426
+ENSMUSG00000045382	Cxcr4	chemokine (C-X-C motif) receptor 4	12767	https://www.ncbi.nlm.nih.gov/gene/?term=12767
+ENSMUSG00000045573	Penk	preproenkephalin	18619	https://www.ncbi.nlm.nih.gov/gene/?term=18619
+ENSMUSG00000046808	Atp10d	ATPase, class V, type 10D	231287	https://www.ncbi.nlm.nih.gov/gene/?term=231287
+ENSMUSG00000049892	Rasd1	RAS, dexamethasone-induced 1	19416	https://www.ncbi.nlm.nih.gov/gene/?term=19416
+ENSMUSG00000050578	Mmp13	matrix metallopeptidase 13	17386	https://www.ncbi.nlm.nih.gov/gene/?term=17386
+ENSMUSG00000050711	Scg2	secretogranin II	20254	https://www.ncbi.nlm.nih.gov/gene/?term=20254
+ENSMUSG00000052139	Babam2	BRISC and BRCA1 A complex member 2	107976	https://www.ncbi.nlm.nih.gov/gene/?term=107976
+ENSMUSG00000094800	Gm9780	predicted gene 9780	100039175	https://www.ncbi.nlm.nih.gov/gene/?term=100039175

@@ -1,0 +1,2 @@
+geneSet	description	link	size	overlap	expect	enrichmentRatio	pValue	FDR	overlapId	userId
+mmu03010	Ribosome	http://www.kegg.jp/kegg-bin/show_pathway?mmu03010+19934+267019+27370+57808+67025+67248+67427	175	7	0.824773413897281	8.487179487179487	1.4575911311154321e-5	0.00451853250645784	19934;267019;27370;57808;67025;67248;67427	Rps15a;Rps26;Rps20;Rpl22;Rpl11;Rpl35a;Rpl39

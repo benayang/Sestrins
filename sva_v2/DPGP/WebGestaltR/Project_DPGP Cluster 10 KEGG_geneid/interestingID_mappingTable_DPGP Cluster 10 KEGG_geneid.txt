@@ -1,0 +1,15 @@
+userId	geneSymbol	geneName	entrezgene	gLink
+ENSMUSG00000005237	Dnah2	dynein, axonemal, heavy chain 2	327954	https://www.ncbi.nlm.nih.gov/gene/?term=327954
+ENSMUSG00000020402	Vdac1	voltage-dependent anion channel 1	22333	https://www.ncbi.nlm.nih.gov/gene/?term=22333
+ENSMUSG00000021457	Syk	spleen tyrosine kinase	20963	https://www.ncbi.nlm.nih.gov/gene/?term=20963
+ENSMUSG00000028893	Sesn2	sestrin 2	230784	https://www.ncbi.nlm.nih.gov/gene/?term=230784
+ENSMUSG00000030732	Chrdl2	chordin-like 2	69121	https://www.ncbi.nlm.nih.gov/gene/?term=69121
+ENSMUSG00000032500	Dclk3	doublecortin-like kinase 3	245038	https://www.ncbi.nlm.nih.gov/gene/?term=245038
+ENSMUSG00000036381	P2ry14	purinergic receptor P2Y, G-protein coupled, 14	140795	https://www.ncbi.nlm.nih.gov/gene/?term=140795
+ENSMUSG00000036896	C1qc	complement component 1, q subcomponent, C chain	12262	https://www.ncbi.nlm.nih.gov/gene/?term=12262
+ENSMUSG00000036905	C1qb	complement component 1, q subcomponent, beta polypeptide	12260	https://www.ncbi.nlm.nih.gov/gene/?term=12260
+ENSMUSG00000038332	Sesn1	sestrin 1	140742	https://www.ncbi.nlm.nih.gov/gene/?term=140742
+ENSMUSG00000042595	Fam199x	family with sequence similarity 199, X-linked	245622	https://www.ncbi.nlm.nih.gov/gene/?term=245622
+ENSMUSG00000042873	Lhfpl4	lipoma HMGIC fusion partner-like protein 4	269788	https://www.ncbi.nlm.nih.gov/gene/?term=269788
+ENSMUSG00000059436	Max	Max protein	17187	https://www.ncbi.nlm.nih.gov/gene/?term=17187
+ENSMUSG00000073791	Efcab7	EF-hand calcium binding domain 7	230500	https://www.ncbi.nlm.nih.gov/gene/?term=230500
